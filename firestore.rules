@@ -1,0 +1,117 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: clients
+// Fields: name (string), cpf (string), address (string), contact (string), email (string), createdAt (timestamp)
+//
+// Collection: projects
+// Fields: clientId (string), name (string), description (string), totalValue (number), status (string), createdAt (timestamp)
+//
+// Collection: projects/{projectId}/installments
+// Fields: projectId (string), amount (number), percentage (number), dueDate (timestamp), status (string), paidAt (timestamp)
+//
+// Collection: expenses
+// Fields: projectId (string, optional), description (string), amount (number), date (timestamp), category (string)
+//
+// Collection: settings
+// Fields: reminderDays (number), reminderMessageTemplate (string)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "dolpholopes@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // Generic validation helpers
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidClient(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.cpf is string && data.cpf.size() >= 11 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidProject(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.totalValue is number && data.totalValue >= 0 &&
+             data.status in ['active', 'completed', 'cancelled'];
+    }
+
+    function isValidInstallment(data) {
+      return data.amount is number && data.amount >= 0 &&
+             data.percentage is number && data.percentage >= 0 && data.percentage <= 100 &&
+             data.status in ['pending', 'paid'];
+    }
+
+    function isValidExpense(data) {
+      return data.description is string && data.description.size() > 0 &&
+             data.amount is number && data.amount >= 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow update: if isAuthenticated() && isValidClient(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      allow update: if isAuthenticated() && isValidProject(request.resource.data);
+      allow delete: if isAdmin();
+
+      match /installments/{installmentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && isValidInstallment(request.resource.data);
+        allow update: if isAuthenticated() && isValidInstallment(request.resource.data);
+        allow delete: if isAdmin();
+      }
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow update: if isAuthenticated() && isValidExpense(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+    }
+  }
+}

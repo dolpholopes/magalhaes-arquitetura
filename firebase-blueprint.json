@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "Information about a client",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the client" },
+        "cpf": { "type": "string", "description": "CPF number" },
+        "address": { "type": "string", "description": "Physical address" },
+        "contact": { "type": "string", "description": "Phone number or other contact info" },
+        "email": { "type": "string", "description": "Email address for reminders" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "cpf", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A project linked to a client",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string", "description": "ID of the client" },
+        "name": { "type": "string", "description": "Project name" },
+        "description": { "type": "string" },
+        "totalValue": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "name", "totalValue", "status"]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "A payment installment for a project",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "amount": { "type": "number" },
+        "percentage": { "type": "number" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "paid"] },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "amount", "percentage", "dueDate", "status"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Office or project related expense",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string", "description": "Optional project link" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "category": { "type": "string" }
+      },
+      "required": ["description", "amount", "date"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "App settings",
+      "type": "object",
+      "properties": {
+        "reminderDays": { "type": "number" },
+        "reminderMessageTemplate": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/clients/{clientId}": { "schema": "Client", "description": "Clients collection" },
+    "/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },
+    "/projects/{projectId}/installments/{installmentId}": { "schema": "Installment", "description": "Installments for a project" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses collection" },
+    "/settings/global": { "schema": "Settings", "description": "Global settings" }
+  }
+}

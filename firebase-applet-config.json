@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0958260815",
-  "appId": "1:419927364930:web:15d2edd21e3ea33680a4db",
-  "apiKey": "AIzaSyC35Hf78787FhgaavevgIvEXOa1qJezWC0",
-  "authDomain": "gen-lang-client-0958260815.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-9ebf51ee-ccea-450c-b83d-675503e662d2",
-  "storageBucket": "gen-lang-client-0958260815.firebasestorage.app",
-  "messagingSenderId": "419927364930",
+  "projectId": "magalhaes-arquitetura",
+  "appId": "1:168440602:web:39ae0681b8cf75c964b2a3",
+  "apiKey": "AIzaSyCVWe58cencA5yYOEisssmTyao3UPUyu6A",
+  "authDomain": "magalhaes-arquitetura.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "magalhaes-arquitetura.firebasestorage.app",
+  "messagingSenderId": "168440602",
   "measurementId": ""
 }

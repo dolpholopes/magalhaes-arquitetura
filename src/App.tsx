@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, signIn, logOut, db, handleFirestoreError, OperationType, signInAnon } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, query, orderBy, doc, getDocFromServer } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, updateDoc, deleteDoc, Timestamp, where, getDocs } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LayoutDashboard, Users, Briefcase, DollarSign, Settings as SettingsIcon, LogOut, LogIn } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -30,135 +30,200 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  const [clients, setClients] = useState<Client[]>([
-    { id: '1', name: 'João Silva', cpf: '123.456.789-00', address: 'Rua A, 123', contact: '(11) 98888-8888', email: 'joao@email.com', createdAt: new Date() as any },
-    { id: '2', name: 'Maria Santos', cpf: '987.654.321-11', address: 'Av. B, 456', contact: '(11) 97777-7777', email: 'maria@email.com', createdAt: new Date() as any },
-  ]);
-  const [projects, setProjects] = useState<Project[]>([
-    { id: 'p1', clientId: '1', name: 'Reforma Cozinha', description: 'Reforma completa da cozinha', totalValue: 15000, status: 'active', createdAt: new Date() as any },
-  ]);
-  const [expenses, setExpenses] = useState<Expense[]>([
-    { id: 'e1', description: 'Material de Construção', amount: 5000, date: new Date() as any, category: 'Material' },
-  ]);
-  const [installments, setInstallments] = useState<Record<string, Installment[]>>({
-    'p1': [
-      { id: 'i1', projectId: 'p1', amount: 7500, percentage: 50, dueDate: new Date() as any, status: 'paid', paidAt: new Date() as any },
-      { id: 'i2', projectId: 'p1', amount: 7500, percentage: 50, dueDate: addMonths(new Date(), 1) as any, status: 'pending' },
-    ]
-  });
+  const [clients, setClients] = useState<Client[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [installments, setInstallments] = useState<Record<string, Installment[]>>({});
 
-  // Local CRUD Handlers
-  const handleAddClient = (data: Omit<Client, 'id' | 'createdAt'>) => {
-    const newClient = { ...data, id: Math.random().toString(36).substr(2, 9), createdAt: new Date() as any };
-    setClients(prev => [...prev, newClient]);
-  };
-  const handleUpdateClient = (id: string, data: Partial<Client>) => {
-    setClients(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-  };
-  const handleDeleteClient = (id: string) => {
-    setClients(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleAddProject = (data: Omit<Project, 'id' | 'createdAt'> & { numInstallments: number }) => {
-    const projectId = Math.random().toString(36).substr(2, 9);
-    const newProject = { 
-      clientId: data.clientId,
-      name: data.name,
-      description: data.description,
-      totalValue: data.totalValue,
-      status: data.status,
-      id: projectId, 
-      createdAt: new Date() as any 
-    };
-    
-    // Generate installments
-    const installmentValue = data.totalValue / data.numInstallments;
-    const percentage = 100 / data.numInstallments;
-    const newInstallments: Installment[] = [];
-    
-    for (let i = 0; i < data.numInstallments; i++) {
-      newInstallments.push({
-        id: Math.random().toString(36).substr(2, 9),
-        projectId: projectId,
-        amount: installmentValue,
-        percentage: percentage,
-        dueDate: addMonths(new Date(), i) as any,
-        status: 'pending'
+  // Firestore CRUD Handlers
+  const handleAddClient = async (data: Omit<Client, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, `users/${user.uid}/clients`), {
+        ...data,
+        createdAt: Timestamp.now()
       });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/clients`);
     }
-
-    setProjects(prev => [...prev, newProject]);
-    setInstallments(prev => ({ ...prev, [projectId]: newInstallments }));
   };
 
-  const handleUpdateProject = (id: string, data: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  const handleUpdateClient = async (id: string, data: Partial<Client>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/clients/${id}`), data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/clients/${id}`);
+    }
   };
 
-  const handleDeleteProject = (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
-    setInstallments(prev => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+  const handleDeleteClient = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/clients/${id}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/clients/${id}`);
+    }
   };
 
-  const handleToggleInstallment = (projectId: string, installmentId: string) => {
-    setInstallments(prev => ({
-      ...prev,
-      [projectId]: prev[projectId].map(inst => 
-        inst.id === installmentId 
-          ? { ...inst, status: inst.status === 'paid' ? 'pending' : 'paid', paidAt: inst.status === 'paid' ? undefined : new Date() as any }
-          : inst
-      )
-    }));
+  const handleAddProject = async (data: Omit<Project, 'id' | 'createdAt'> & { numInstallments: number }) => {
+    if (!user) return;
+    try {
+      const projectRef = await addDoc(collection(db, `users/${user.uid}/projects`), {
+        clientId: data.clientId,
+        name: data.name,
+        description: data.description,
+        totalValue: data.totalValue,
+        status: data.status,
+        createdAt: Timestamp.now()
+      });
+      
+      const installmentValue = data.totalValue / data.numInstallments;
+      const percentage = 100 / data.numInstallments;
+      
+      for (let i = 0; i < data.numInstallments; i++) {
+        await addDoc(collection(db, `users/${user.uid}/installments`), {
+          projectId: projectRef.id,
+          amount: installmentValue,
+          percentage: percentage,
+          dueDate: Timestamp.fromDate(addMonths(new Date(), i)),
+          status: 'pending'
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/projects`);
+    }
   };
 
-  const handleUpdateInstallment = (projectId: string, installmentId: string, data: Partial<Installment>) => {
-    setInstallments(prev => ({
-      ...prev,
-      [projectId]: prev[projectId].map(inst => 
-        inst.id === installmentId ? { ...inst, ...data } : inst
-      )
-    }));
+  const handleUpdateProject = async (id: string, data: Partial<Project>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/projects/${id}`), data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/projects/${id}`);
+    }
   };
 
-  const handleAddExpense = (data: Omit<Expense, 'id'>) => {
-    const newExpense = { ...data, id: Math.random().toString(36).substr(2, 9) };
-    setExpenses(prev => [...prev, newExpense]);
+  const handleDeleteProject = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/projects/${id}`));
+      const instQuery = query(collection(db, `users/${user.uid}/installments`), where('projectId', '==', id));
+      const snapshot = await getDocs(instQuery);
+      snapshot.forEach(async (docSnap) => {
+        await deleteDoc(doc(db, `users/${user.uid}/installments/${docSnap.id}`));
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/projects/${id}`);
+    }
   };
-  const handleUpdateExpense = (id: string, data: Partial<Expense>) => {
-    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+
+  const handleToggleInstallment = async (projectId: string, installmentId: string) => {
+    if (!user) return;
+    try {
+      const inst = installments[projectId]?.find(i => i.id === installmentId);
+      if (!inst) return;
+      const newStatus = inst.status === 'paid' ? 'pending' : 'paid';
+      const paidAt = newStatus === 'paid' ? Timestamp.now() : null;
+      
+      await updateDoc(doc(db, `users/${user.uid}/installments/${installmentId}`), {
+        status: newStatus,
+        paidAt: paidAt
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/installments/${installmentId}`);
+    }
   };
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(prev => prev.filter(e => e.id !== id));
+
+  const handleUpdateInstallment = async (projectId: string, installmentId: string, data: Partial<Installment>) => {
+    if (!user) return;
+    try {
+      const updateData: any = { ...data };
+      if (data.dueDate) updateData.dueDate = data.dueDate instanceof Date ? Timestamp.fromDate(data.dueDate) : data.dueDate;
+      if (data.paidAt) updateData.paidAt = data.paidAt instanceof Date ? Timestamp.fromDate(data.paidAt) : data.paidAt;
+      
+      await updateDoc(doc(db, `users/${user.uid}/installments/${installmentId}`), updateData);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/installments/${installmentId}`);
+    }
+  };
+
+  const handleAddExpense = async (data: Omit<Expense, 'id'>) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, `users/${user.uid}/expenses`), {
+        ...data,
+        date: data.date instanceof Date ? Timestamp.fromDate(data.date) : data.date
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/expenses`);
+    }
+  };
+
+  const handleUpdateExpense = async (id: string, data: Partial<Expense>) => {
+    if (!user) return;
+    try {
+      const updateData: any = { ...data };
+      if (data.date) updateData.date = data.date instanceof Date ? Timestamp.fromDate(data.date) : data.date;
+      await updateDoc(doc(db, `users/${user.uid}/expenses/${id}`), updateData);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/expenses/${id}`);
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/expenses/${id}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/expenses/${id}`);
+    }
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
-      // For now, we'll just set a mock user if not authenticated to bypass login screen
-      if (!u) {
-        setUser({
-          uid: 'local-user',
-          displayName: 'Usuário Local',
-          email: 'local@exemplo.com',
-          isAnonymous: true,
-          photoURL: 'https://picsum.photos/seed/local/200'
-        } as User);
-        setLoading(false);
-      } else {
-        setUser(u);
-        setLoading(false);
-      }
+      setUser(u);
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Disable Firebase listeners for now
   useEffect(() => {
-    // Firebase is disabled as per user request
-    return () => {};
+    if (!user) return;
+
+    const clientsRef = collection(db, `users/${user.uid}/clients`);
+    const projectsRef = collection(db, `users/${user.uid}/projects`);
+    const expensesRef = collection(db, `users/${user.uid}/expenses`);
+    const installmentsRef = collection(db, `users/${user.uid}/installments`);
+
+    const unsubClients = onSnapshot(query(clientsRef, orderBy('createdAt', 'desc')), (snapshot) => {
+      setClients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/clients`));
+
+    const unsubProjects = onSnapshot(query(projectsRef, orderBy('createdAt', 'desc')), (snapshot) => {
+      setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/projects`));
+
+    const unsubExpenses = onSnapshot(query(expensesRef, orderBy('date', 'desc')), (snapshot) => {
+      setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/expenses`));
+
+    const unsubInstallments = onSnapshot(query(installmentsRef, orderBy('dueDate', 'asc')), (snapshot) => {
+      const insts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Installment));
+      const grouped: Record<string, Installment[]> = {};
+      insts.forEach(inst => {
+        if (!grouped[inst.projectId]) grouped[inst.projectId] = [];
+        grouped[inst.projectId].push(inst);
+      });
+      setInstallments(grouped);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/installments`));
+
+    return () => {
+      unsubClients();
+      unsubProjects();
+      unsubExpenses();
+      unsubInstallments();
+    };
   }, [user]);
 
   if (loading) {
@@ -176,10 +241,26 @@ export default function App() {
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
   ];
 
-  if (loading || !user) {
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F4]">
+        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-200 text-center max-w-sm w-full mx-4">
+          <div className="relative w-16 h-16 mx-auto mb-6">
+            <span className="absolute left-0 top-0 text-5xl font-light text-slate-900 leading-none select-none z-10">J</span>
+            <span className="absolute left-3 top-2 text-5xl font-extralight bg-slate-300 text-white leading-none select-none z-0">M</span>
+          </div>
+          <h1 className="text-xl font-light tracking-[0.15em] uppercase text-slate-800 leading-tight mb-8">
+            Magalhães<br />
+            <span className="font-bold tracking-normal">Arquitetura</span>
+          </h1>
+          <button
+            onClick={signIn}
+            className="w-full flex items-center justify-center space-x-2 bg-slate-900 text-white px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors"
+          >
+            <LogIn className="h-5 w-5" />
+            <span>Entrar com Google</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -194,8 +275,8 @@ export default function App() {
           <div className="p-6">
             <div className="flex items-center space-x-4">
               <div className="relative w-10 h-10 shrink-0">
-                <span className="absolute left-0 top-0 text-3xl font-light text-slate-900 leading-none select-none">J</span>
-                <span className="absolute left-2.5 top-1.5 text-3xl font-extralight text-slate-400 leading-none mix-blend-multiply select-none opacity-80">M</span>
+                <span className="absolute left-0 top-0 text-3xl font-light text-slate-900 leading-none select-none z-10">J</span>
+                <span className="absolute left-2.5 top-1.5 text-3xl font-extralight bg-slate-300 text-white leading-none select-none z-0">M</span>
               </div>
               <div className="border-l border-slate-100 pl-4">
                 <h1 className="text-xs font-light tracking-[0.15em] uppercase text-slate-800 leading-tight">

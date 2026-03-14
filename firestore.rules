@@ -76,42 +76,24 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    match /clients/{clientId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidClient(request.resource.data);
-      allow update: if isAuthenticated() && isValidClient(request.resource.data);
-      allow delete: if isAdmin();
-    }
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
 
-    match /projects/{projectId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidProject(request.resource.data);
-      allow update: if isAuthenticated() && isValidProject(request.resource.data);
-      allow delete: if isAdmin();
+      match /clients/{clientId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /projects/{projectId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
 
       match /installments/{installmentId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && isValidInstallment(request.resource.data);
-        allow update: if isAuthenticated() && isValidInstallment(request.resource.data);
-        allow delete: if isAdmin();
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
       }
-    }
 
-    match /expenses/{expenseId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidExpense(request.resource.data);
-      allow update: if isAuthenticated() && isValidExpense(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      match /expenses/{expenseId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
     }
   }
 }

@@ -1,21 +1,119 @@
 import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, onSnapshot, query, orderBy, collectionGroup } from 'firebase/firestore';
-import { Project, Expense, Installment } from '../types';
-import { Plus, Search, Edit2, Trash2, X, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, Filter, Download, FileText } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { Project, Expense, Installment, Client } from '../types';
+import { Plus, Search, Edit2, Trash2, X, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, Filter, Download, FileText, ChevronDown } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, isSameMonth, startOfYear, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
-import { exportToCSV, exportToPDF } from '../utils/export';
+import { exportToPDF } from '../utils/export';
 import { formatDate } from '../utils/date';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { ConfirmModal } from './ConfirmModal';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function SearchableSelect({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder, 
+  label 
+}: { 
+  options: { id: string, name: string }[], 
+  value: string, 
+  onChange: (id: string) => void, 
+  placeholder: string,
+  label: string
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const selectedOption = options.find(o => o.id === value);
+  const filteredOptions = options.filter(o => 
+    o.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-1 relative">
+      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500 flex items-center justify-between text-left transition-all"
+      >
+        <span className={cn("truncate mr-2", selectedOption ? "text-slate-900 font-medium" : "text-slate-400")}>
+          {selectedOption ? selectedOption.name : placeholder}
+        </span>
+        <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform flex-shrink-0", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-2 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-100 rounded-lg text-sm outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              <button
+                onClick={() => {
+                  onChange('all');
+                  setIsOpen(false);
+                  setSearchTerm('');
+                }}
+                className={cn(
+                  "w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors",
+                  value === 'all' ? "bg-slate-50 text-slate-900 font-bold border-l-4 border-slate-800" : "text-slate-600 pl-5"
+                )}
+              >
+                {placeholder}
+              </button>
+              {filteredOptions.map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => {
+                    onChange(option.id);
+                    setIsOpen(false);
+                    setSearchTerm('');
+                  }}
+                  className={cn(
+                    "w-full px-4 py-2 text-left text-sm hover:bg-slate-50 transition-colors",
+                    value === option.id ? "bg-slate-50 text-slate-900 font-bold border-l-4 border-slate-800" : "text-slate-600 pl-5"
+                  )}
+                >
+                  {option.name}
+                </button>
+              ))}
+              {filteredOptions.length === 0 && (
+                <div className="px-4 py-8 text-center text-slate-400 text-sm italic">
+                  Nenhum resultado encontrado
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   projects: Project[];
+  clients: Client[];
   expenses: Expense[];
   allInstallments: Installment[];
   onAddExpense: (data: Omit<Expense, 'id'>) => void;
@@ -23,13 +121,27 @@ interface Props {
   onDeleteExpense: (id: string) => void;
 }
 
-export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, onUpdateExpense, onDeleteExpense }: Props) {
+export function FinanceTab({ projects, clients, expenses, allInstallments, onAddExpense, onUpdateExpense, onDeleteExpense }: Props) {
   const [dateFilter, setDateFilter] = useState({
     start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
   });
+  const [periodType, setPeriodType] = useState<'month' | 'custom'>('month');
+  const [clientFilter, setClientFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
+
+  const currentYear = new Date().getFullYear();
+  const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
+
+  const handleMonthClick = (month: Date) => {
+    setPeriodType('month');
+    setDateFilter({
+      start: format(startOfMonth(month), 'yyyy-MM-dd'),
+      end: format(endOfMonth(month), 'yyyy-MM-dd')
+    });
+  };
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     projectId: '',
@@ -46,7 +158,9 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
       end: parseISO(dateFilter.end) 
     });
     const isProjectMatch = projectFilter === 'all' || e.projectId === projectFilter;
-    return isWithinDate && isProjectMatch;
+    const project = projects.find(p => p.id === e.projectId);
+    const isClientMatch = clientFilter === 'all' || (project && project.clientId === clientFilter);
+    return isWithinDate && isProjectMatch && isClientMatch;
   });
 
   const filteredInstallments = allInstallments.filter(i => {
@@ -56,7 +170,9 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
       end: parseISO(dateFilter.end) 
     });
     const isProjectMatch = projectFilter === 'all' || i.projectId === projectFilter;
-    return isWithinDate && isProjectMatch;
+    const project = projects.find(p => p.id === i.projectId);
+    const isClientMatch = clientFilter === 'all' || (project && project.clientId === clientFilter);
+    return isWithinDate && isProjectMatch && isClientMatch;
   });
 
   const totalRevenue = filteredInstallments.filter(i => i.status === 'paid').reduce((acc, i) => acc + i.amount, 0);
@@ -88,20 +204,14 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
   };
 
   const handleDeleteExpenseClick = async (id: string) => {
-    if (confirm('Excluir esta despesa?')) {
-      onDeleteExpense(id);
-    }
+    setExpenseToDelete(id);
   };
 
-  const handleExportCSV = () => {
-    const data = filteredExpenses.map(e => ({
-      Descrição: e.description,
-      Valor: e.amount,
-      Data: formatDate(e.date),
-      Categoria: e.category,
-      Projeto: projects.find(p => p.id === e.projectId)?.name || 'Geral'
-    }));
-    exportToCSV(data, 'financeiro');
+  const confirmDeleteExpense = () => {
+    if (expenseToDelete) {
+      onDeleteExpense(expenseToDelete);
+      setExpenseToDelete(null);
+    }
   };
 
   const handleExportPDF = () => {
@@ -124,9 +234,6 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
           <p className="text-slate-500">Análise de receitas, despesas e saúde do escritório.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExportCSV} className="p-2 text-slate-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all">
-            <FileText className="h-5 w-5" />
-          </button>
           <button onClick={handleExportPDF} className="p-2 text-slate-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all">
             <Download className="h-5 w-5" />
           </button>
@@ -141,35 +248,84 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end">
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Início</label>
-          <input 
-            type="date" 
-            value={dateFilter.start} 
-            onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Fim</label>
-          <input 
-            type="date" 
-            value={dateFilter.end} 
-            onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
-            className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500"
-          />
-        </div>
-        <div className="space-y-1 flex-1 min-w-[200px]">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Projeto</label>
-          <select 
-            value={projectFilter} 
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500"
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          {months.map((month) => {
+            const isActive = periodType === 'month' && isSameMonth(month, parseISO(dateFilter.start));
+            return (
+              <button
+                key={month.toISOString()}
+                onClick={() => handleMonthClick(month)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-sm font-medium transition-all border capitalize",
+                  isActive 
+                    ? "bg-slate-800 text-white border-slate-800 shadow-md" 
+                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                )}
+              >
+                {format(month, 'MMM', { locale: ptBR })}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setPeriodType('custom')}
+            className={cn(
+              "px-4 py-2 rounded-full text-sm font-medium transition-all border flex items-center gap-2",
+              periodType === 'custom'
+                ? "bg-slate-800 text-white border-slate-800 shadow-md"
+                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+            )}
           >
-            <option value="all">Todos os Projetos</option>
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+            <Filter className="h-4 w-4" />
+            Personalizado
+          </button>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          {periodType === 'custom' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-6 border-b border-slate-100">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Início</label>
+                <input 
+                  type="date" 
+                  value={dateFilter.start} 
+                  onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Fim</label>
+                <input 
+                  type="date" 
+                  value={dateFilter.end} 
+                  onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-500"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SearchableSelect
+              label="Cliente"
+              placeholder="Todos os Clientes"
+              options={clients.map(c => ({ id: c.id, name: c.name }))}
+              value={clientFilter}
+              onChange={(id) => {
+                setClientFilter(id);
+                setProjectFilter('all');
+              }}
+            />
+            <SearchableSelect
+              label="Projeto"
+              placeholder="Todos os Projetos"
+              options={projects
+                .filter(p => clientFilter === 'all' || p.clientId === clientFilter)
+                .map(p => ({ id: p.id, name: p.name }))}
+              value={projectFilter}
+              onChange={(id) => setProjectFilter(id)}
+            />
+          </div>
         </div>
       </div>
 
@@ -303,8 +459,14 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => setIsModalOpen(false)}
+        >
+          <div 
+            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-xl font-bold text-slate-900">Nova Despesa</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white rounded-full transition-colors">
@@ -382,6 +544,16 @@ export function FinanceTab({ projects, expenses, allInstallments, onAddExpense, 
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!expenseToDelete}
+        title="Excluir Despesa"
+        message="Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita."
+        onConfirm={confirmDeleteExpense}
+        onCancel={() => setExpenseToDelete(null)}
+        confirmText="Excluir"
+        isDestructive={true}
+      />
     </div>
   );
 }

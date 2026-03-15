@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, signIn, logOut, db, handleFirestoreError, OperationType, signInAnon } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, updateDoc, deleteDoc, Timestamp, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, updateDoc, deleteDoc, Timestamp, where, getDocs, writeBatch } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LayoutDashboard, Users, Briefcase, DollarSign, Settings as SettingsIcon, LogOut, LogIn } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -66,8 +66,11 @@ export default function App() {
     }
   };
 
-  const handleAddProject = async (data: Omit<Project, 'id' | 'createdAt'> & { numInstallments: number }) => {
+  const handleAddProject = async (data: Omit<Project, 'id' | 'createdAt'> & { numInstallments: number, customInstallments?: number[], firstInstallmentDate?: string }) => {
     if (!user) return;
+
+    const startDate = data.firstInstallmentDate ? new Date(data.firstInstallmentDate + 'T12:00:00') : new Date();
+
     try {
       const projectRef = await addDoc(collection(db, `users/${user.uid}/projects`), {
         clientId: data.clientId,
@@ -78,15 +81,15 @@ export default function App() {
         createdAt: Timestamp.now()
       });
       
-      const installmentValue = data.totalValue / data.numInstallments;
-      const percentage = 100 / data.numInstallments;
-      
       for (let i = 0; i < data.numInstallments; i++) {
+        const percentage = data.customInstallments?.[i] ?? (100 / data.numInstallments);
+        const installmentValue = (data.totalValue * percentage) / 100;
+        
         await addDoc(collection(db, `users/${user.uid}/installments`), {
           projectId: projectRef.id,
           amount: installmentValue,
           percentage: percentage,
-          dueDate: Timestamp.fromDate(addMonths(new Date(), i)),
+          dueDate: Timestamp.fromDate(addMonths(startDate, i)),
           status: 'pending'
         });
       }
@@ -120,16 +123,39 @@ export default function App() {
 
   const handleToggleInstallment = async (projectId: string, installmentId: string) => {
     if (!user) return;
+    
+    const projectInstallments = installments[projectId] || [];
+    const inst = projectInstallments.find(i => i.id === installmentId);
+    if (!inst) return;
+    
+    const newStatus = inst.status === 'paid' ? 'pending' : 'paid';
+    const paidAt = newStatus === 'paid' ? Timestamp.now() : null;
+
+    // Check if all installments will be paid
+    const allWillBePaid = projectInstallments.every(i => 
+      i.id === installmentId ? newStatus === 'paid' : i.status === 'paid'
+    );
+    
+    const project = projects.find(p => p.id === projectId);
+    const newProjectStatus = allWillBePaid ? 'completed' : (project?.status === 'completed' ? 'active' : project?.status);
+
     try {
-      const inst = installments[projectId]?.find(i => i.id === installmentId);
-      if (!inst) return;
-      const newStatus = inst.status === 'paid' ? 'pending' : 'paid';
-      const paidAt = newStatus === 'paid' ? Timestamp.now() : null;
+      const batch = writeBatch(db);
       
-      await updateDoc(doc(db, `users/${user.uid}/installments/${installmentId}`), {
+      const instRef = doc(db, `users/${user.uid}/installments/${installmentId}`);
+      batch.update(instRef, {
         status: newStatus,
         paidAt: paidAt
       });
+      
+      if (project && project.status !== newProjectStatus) {
+        const projRef = doc(db, `users/${user.uid}/projects/${projectId}`);
+        batch.update(projRef, {
+          status: newProjectStatus
+        });
+      }
+      
+      await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/installments/${installmentId}`);
     }
@@ -269,10 +295,10 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-[#F5F5F4] flex flex-col md:flex-row">
-        {/* Sidebar */}
-        <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex flex-col">
-          <div className="p-6">
+      <div className="min-h-screen bg-[#F5F5F4] flex flex-col md:flex-row pb-16 md:pb-0">
+        {/* Sidebar / Mobile Header */}
+        <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-row md:flex-col justify-between md:justify-start md:sticky md:top-0 md:h-screen z-20">
+          <div className="p-4 md:p-6 flex items-center justify-between md:justify-start w-full md:w-auto">
             <div className="flex items-center space-x-4">
               <div className="relative w-10 h-10 shrink-0">
                 <span className="absolute left-0 top-0 text-3xl font-light text-slate-900 leading-none select-none z-10">J</span>
@@ -285,12 +311,23 @@ export default function App() {
                 </h1>
               </div>
             </div>
-            <p className="text-[8px] uppercase tracking-[0.3em] text-slate-400 font-medium mt-4 ml-1">
+            <p className="hidden md:block text-[8px] uppercase tracking-[0.3em] text-slate-400 font-medium mt-4 ml-1">
               {isAnonymous ? 'Modo de Teste' : 'Office Control v1.0'}
             </p>
+            
+            {/* Mobile User Actions */}
+            <div className="md:hidden flex items-center space-x-3">
+              <button 
+                onClick={isAnonymous ? signIn : logOut} 
+                className={cn("transition-colors", isAnonymous ? "text-slate-600 hover:text-slate-800" : "text-slate-400 hover:text-red-600")}
+                title={isAnonymous ? "Entrar com Google" : "Sair"}
+              >
+                {isAnonymous ? <LogIn className="h-5 w-5" /> : <LogOut className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
           
-          <nav className="flex-1 px-4 space-y-1">
+          <nav className="hidden md:block flex-1 px-4 space-y-1 mt-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -308,14 +345,8 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-slate-100">
+          <div className="hidden md:block p-4 border-t border-slate-100">
             <div className="flex items-center space-x-3 px-4 py-3">
-              <img 
-                src={user.photoURL || `https://picsum.photos/seed/${user.uid}/200`} 
-                alt="" 
-                className="h-8 w-8 rounded-full border border-slate-200" 
-                referrerPolicy="no-referrer" 
-              />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-slate-900 truncate">
                   {user.displayName || (isAnonymous ? 'Usuário de Teste' : 'Usuário')}
@@ -367,6 +398,7 @@ export default function App() {
             {activeTab === 'finance' && (
               <FinanceTab 
                 projects={projects} 
+                clients={clients}
                 expenses={expenses} 
                 allInstallments={Object.values(installments).flat()}
                 onAddExpense={handleAddExpense}
@@ -376,6 +408,25 @@ export default function App() {
             )}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center z-50 pb-safe">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "flex flex-col items-center justify-center w-full py-3 space-y-1 transition-colors",
+                activeTab === tab.id 
+                  ? "text-slate-900" 
+                  : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              <tab.icon className={cn("h-5 w-5", activeTab === tab.id ? "text-slate-900" : "text-slate-400")} />
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
     </ErrorBoundary>
   );

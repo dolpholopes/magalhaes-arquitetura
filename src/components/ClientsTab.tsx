@@ -3,7 +3,9 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { Client } from '../types';
 import { Plus, Search, Edit2, Trash2, X, UserPlus, FileText, Download } from 'lucide-react';
-import { exportToCSV, exportToPDF } from '../utils/export';
+import { exportToPDF } from '../utils/export';
+import { formatCpfCnpj, formatPhone } from '../utils/formatters';
+import { ConfirmModal } from './ConfirmModal';
 
 interface Props {
   clients: Client[];
@@ -16,6 +18,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     cpf: '',
@@ -44,9 +47,9 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
       setEditingClient(client);
       setFormData({
         name: client.name,
-        cpf: client.cpf,
+        cpf: formatCpfCnpj(client.cpf),
         address: client.address,
-        contact: client.contact,
+        contact: formatPhone(client.contact),
         email: client.email
       });
     } else {
@@ -62,13 +65,14 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      onDelete(id);
-    }
+    setClientToDelete(id);
   };
 
-  const handleExportCSV = () => {
-    exportToCSV(clients, 'clientes');
+  const confirmDelete = () => {
+    if (clientToDelete) {
+      onDelete(clientToDelete);
+      setClientToDelete(null);
+    }
   };
 
   const handleExportPDF = () => {
@@ -85,13 +89,6 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
           <p className="text-slate-500">Gerencie sua base de contatos e clientes.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button 
-            onClick={handleExportCSV}
-            className="p-2 text-slate-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all"
-            title="Exportar CSV"
-          >
-            <FileText className="h-5 w-5" />
-          </button>
           <button 
             onClick={handleExportPDF}
             className="p-2 text-slate-600 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 transition-all"
@@ -137,7 +134,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
               </div>
             </div>
             <h3 className="text-lg font-bold text-slate-900 mb-1">{client.name}</h3>
-            <p className="text-xs font-mono text-slate-500 mb-4">CPF: {client.cpf}</p>
+            <p className="text-xs font-mono text-slate-500 mb-4">Doc: {formatCpfCnpj(client.cpf)}</p>
             
             <div className="space-y-2">
               <div className="flex items-center text-sm text-slate-600">
@@ -146,7 +143,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
               </div>
               <div className="flex items-center text-sm text-slate-600">
                 <span className="w-20 font-medium text-slate-400 text-[10px] uppercase tracking-wider">Contato</span>
-                <span>{client.contact}</span>
+                <span>{formatPhone(client.contact)}</span>
               </div>
               <div className="flex items-start text-sm text-slate-600">
                 <span className="w-20 font-medium text-slate-400 text-[10px] uppercase tracking-wider">Endereço</span>
@@ -158,8 +155,14 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={closeModal}
+        >
+          <div 
+            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 className="text-xl font-bold text-slate-900">
                 {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
@@ -181,12 +184,12 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">CPF</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">CPF / CNPJ</label>
                   <input
                     required
                     type="text"
                     value={formData.cpf}
-                    onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, cpf: formatCpfCnpj(e.target.value) })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
                   />
                 </div>
@@ -195,7 +198,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                   <input
                     type="text"
                     value={formData.contact}
-                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
                   />
                 </div>
@@ -237,6 +240,16 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!clientToDelete}
+        title="Excluir Cliente"
+        message="Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+        onConfirm={confirmDelete}
+        onCancel={() => setClientToDelete(null)}
+        confirmText="Excluir"
+        isDestructive={true}
+      />
     </div>
   );
 }

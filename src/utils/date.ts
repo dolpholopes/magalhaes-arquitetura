@@ -20,3 +20,24 @@ export function formatDate(date: any): string {
     return 'Data Inválida';
   }
 }
+
+export function formatDateForInput(date: any): string {
+  if (!date) return '';
+  
+  // Handle Firestore Timestamp
+  if (typeof date.toDate === 'function') {
+    return format(date.toDate(), 'yyyy-MM-dd');
+  }
+  
+  // Handle Date object
+  if (date instanceof Date) {
+    return format(date, 'yyyy-MM-dd');
+  }
+  
+  // Handle string
+  try {
+    return format(new Date(date), 'yyyy-MM-dd');
+  } catch (e) {
+    return '';
+  }
+}

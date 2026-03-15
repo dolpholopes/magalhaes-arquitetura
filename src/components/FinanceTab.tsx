@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, onSnapshot, query, orderBy, collectionGroup } from 'firebase/firestore';
 import { Project, Expense, Installment, Client } from '../types';
-import { Plus, Search, Edit2, Trash2, X, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, Filter, Download, FileText, ChevronDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, Filter, Download, FileText, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, isSameMonth, startOfYear, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
@@ -129,6 +129,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
   const [periodType, setPeriodType] = useState<'month' | 'custom'>('month');
   const [clientFilter, setClientFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
+  const [currentChart, setCurrentChart] = useState(0);
 
   const currentYear = new Date().getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
@@ -371,90 +372,119 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
         </div>
       </div>
 
-      {/* Charts */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Receita vs Despesa por Projeto</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={revenueByProject}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  cursor={{ fill: '#F8FAFC' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 20 }} />
-                <Bar dataKey="receita" fill="#475569" radius={[4, 4, 0, 0]} name="Receita" />
-                <Bar dataKey="despesa" fill="#EF4444" radius={[4, 4, 0, 0]} name="Despesa" />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Charts Carousel */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+              {currentChart === 0 ? "Receita vs Despesa por Projeto" : "Distribuição Financeira"}
+            </h3>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setCurrentChart(prev => prev === 0 ? 1 : 0)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="flex gap-1">
+                <div className={cn("h-1.5 w-1.5 rounded-full transition-all", currentChart === 0 ? "bg-slate-800 w-3" : "bg-slate-200")} />
+                <div className={cn("h-1.5 w-1.5 rounded-full transition-all", currentChart === 1 ? "bg-slate-800 w-3" : "bg-slate-200")} />
+              </div>
+              <button 
+                onClick={() => setCurrentChart(prev => prev === 0 ? 1 : 0)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="h-80 flex-1">
+            {currentChart === 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueByProject}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    cursor={{ fill: '#F8FAFC' }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 20 }} />
+                  <Bar dataKey="receita" fill="#475569" radius={[4, 4, 0, 0]} name="Receita" />
+                  <Bar dataKey="despesa" fill="#EF4444" radius={[4, 4, 0, 0]} name="Despesa" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Distribuição Financeira</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
+        {/* Expenses Table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Histórico de Despesas</h3>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+              {filteredExpenses.length} registros
+            </span>
           </div>
-        </div>
-      </div>
-
-      {/* Expenses Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Histórico de Despesas</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50">
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Data</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Descrição</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Categoria</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Projeto</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredExpenses.map(e => (
-                <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 text-sm text-slate-600">{formatDate(e.date)}</td>
-                  <td className="p-4 text-sm font-medium text-slate-900">{e.description}</td>
-                  <td className="p-4 text-sm text-slate-600">
-                    <span className="px-2 py-1 bg-slate-100 rounded-md text-[10px] font-bold uppercase">{e.category}</span>
-                  </td>
-                  <td className="p-4 text-sm text-slate-600">{projects.find(p => p.id === e.projectId)?.name || '-'}</td>
-                  <td className="p-4 text-sm font-bold text-red-600">R$ {e.amount.toLocaleString('pt-BR')}</td>
-                  <td className="p-4">
-                    <button onClick={() => handleDeleteExpenseClick(e.id)} className="p-2 text-slate-400 hover:text-red-600 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left border-collapse min-w-[500px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Data</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Descrição</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ações</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredExpenses.length > 0 ? (
+                  filteredExpenses.map(e => (
+                    <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 text-xs text-slate-600 whitespace-nowrap">{formatDate(e.date)}</td>
+                      <td className="p-4 text-xs font-medium text-slate-900">
+                        <div className="truncate max-w-[150px]" title={e.description}>{e.description}</div>
+                        <div className="text-[9px] text-slate-400 uppercase tracking-tighter">{e.category}</div>
+                      </td>
+                      <td className="p-4 text-xs font-bold text-red-600 whitespace-nowrap">R$ {e.amount.toLocaleString('pt-BR')}</td>
+                      <td className="p-4">
+                        <button onClick={() => handleDeleteExpenseClick(e.id)} className="p-2 text-slate-400 hover:text-red-600 transition-colors">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="p-12 text-center text-slate-400 text-sm italic">
+                      Nenhuma despesa encontrada para este período.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

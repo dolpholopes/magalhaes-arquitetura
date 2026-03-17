@@ -9,10 +9,9 @@
         "cpf": { "type": "string", "description": "CPF number" },
         "address": { "type": "string", "description": "Physical address" },
         "contact": { "type": "string", "description": "Phone number or other contact info" },
-        "email": { "type": "string", "description": "Email address for reminders" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "cpf", "email"]
+      "required": ["name", "cpf"]
     },
     "Project": {
       "title": "Project",
@@ -66,10 +65,10 @@
     }
   },
   "firestore": {
-    "/clients/{clientId}": { "schema": "Client", "description": "Clients collection" },
-    "/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },
-    "/projects/{projectId}/installments/{installmentId}": { "schema": "Installment", "description": "Installments for a project" },
-    "/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses collection" },
-    "/settings/global": { "schema": "Settings", "description": "Global settings" }
+    "/users/{userId}/clients/{clientId}": { "schema": "Client", "description": "Clients collection" },
+    "/users/{userId}/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },
+    "/users/{userId}/installments/{installmentId}": { "schema": "Installment", "description": "Installments for a project" },
+    "/users/{userId}/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses collection" },
+    "/users/{userId}/settings/global": { "schema": "Settings", "description": "Global settings" }
   }
 }

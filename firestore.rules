@@ -3,7 +3,7 @@
 // ===============================================================
 //
 // Collection: clients
-// Fields: name (string), cpf (string), address (string), contact (string), email (string), createdAt (timestamp)
+// Fields: name (string), cpf (string), address (string), contact (string), createdAt (timestamp)
 //
 // Collection: projects
 // Fields: clientId (string), name (string), description (string), totalValue (number), status (string), createdAt (timestamp)
@@ -51,8 +51,7 @@ service cloud.firestore {
 
     function isValidClient(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
-             data.cpf is string && data.cpf.size() >= 11 &&
-             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+             data.cpf is string && data.cpf.size() >= 11;
     }
 
     function isValidProject(data) {

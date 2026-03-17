@@ -400,18 +400,27 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
             </div>
           </div>
 
-          <div className="h-80 flex-1">
+          <div className="h-80 w-full">
             {currentChart === 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revenueByProject}>
+                <BarChart data={revenueByProject} margin={{ top: 10, right: 10, left: 0, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 9, fill: '#64748B' }}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    height={60}
+                  />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                     cursor={{ fill: '#F8FAFC' }}
                   />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 20 }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 20 }} verticalAlign="bottom" />
                   <Bar dataKey="receita" fill="#475569" radius={[4, 4, 0, 0]} name="Receita" />
                   <Bar dataKey="despesa" fill="#EF4444" radius={[4, 4, 0, 0]} name="Despesa" />
                 </BarChart>
@@ -422,7 +431,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
                   <Pie
                     data={statusData}
                     cx="50%"
-                    cy="50%"
+                    cy="45%"
                     innerRadius={60}
                     outerRadius={80}
                     paddingAngle={5}
@@ -433,7 +442,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 10 }} />
                 </PieChart>
               </ResponsiveContainer>
             )}

@@ -4,7 +4,6 @@ export interface Client {
   cpf: string;
   address: string;
   contact: string;
-  email: string;
   createdAt: any;
 }
 

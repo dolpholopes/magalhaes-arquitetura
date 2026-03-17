@@ -17,6 +17,7 @@ import { ClientsTab } from './components/ClientsTab';
 import { ProjectsTab } from './components/ProjectsTab';
 import { FinanceTab } from './components/FinanceTab';
 import { DashboardTab } from './components/DashboardTab';
+import { Logo } from './components/Logo';
 
 import { Client, Project, Expense, Installment } from './types';
 import { addMonths } from 'date-fns';
@@ -271,10 +272,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F5F4]">
         <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-200 text-center max-w-sm w-full mx-4">
-          <div className="relative w-16 h-16 mx-auto mb-6">
-            <span className="absolute left-0 top-0 text-5xl font-light text-slate-900 leading-none select-none z-10">J</span>
-            <span className="absolute left-3 top-2 text-5xl font-extralight bg-slate-300 text-white leading-none select-none z-0">M</span>
-          </div>
+          <Logo className="w-16 h-16 mx-auto mb-6 text-slate-900" />
           <h1 className="text-xl font-light tracking-[0.15em] uppercase text-slate-800 leading-tight mb-8">
             Magalhães<br />
             <span className="font-bold tracking-normal">Arquitetura</span>
@@ -300,10 +298,7 @@ export default function App() {
         <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-row md:flex-col justify-between md:justify-start md:sticky md:top-0 md:h-screen z-20">
           <div className="p-4 md:p-6 flex items-center justify-between md:justify-start w-full md:w-auto">
             <div className="flex items-center space-x-4">
-              <div className="relative w-10 h-10 shrink-0">
-                <span className="absolute left-0 top-0 text-3xl font-light text-slate-900 leading-none select-none z-10">J</span>
-                <span className="absolute left-2.5 top-1.5 text-3xl font-extralight bg-slate-300 text-white leading-none select-none z-0">M</span>
-              </div>
+              <Logo className="w-10 h-10 shrink-0 text-slate-900" />
               <div className="border-l border-slate-100 pl-4">
                 <h1 className="text-xs font-light tracking-[0.15em] uppercase text-slate-800 leading-tight">
                   Magalhães<br />
@@ -311,9 +306,6 @@ export default function App() {
                 </h1>
               </div>
             </div>
-            <p className="hidden md:block text-[8px] uppercase tracking-[0.3em] text-slate-400 font-medium mt-4 ml-1">
-              {isAnonymous ? 'Modo de Teste' : 'Office Control v1.0'}
-            </p>
             
             {/* Mobile User Actions */}
             <div className="md:hidden flex items-center space-x-3">
@@ -365,47 +357,55 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto">
-            {activeTab === 'dashboard' && (
-              <DashboardTab 
-                clients={clients} 
-                projects={projects} 
-                expenses={expenses} 
-                allInstallments={Object.values(installments).flat()} 
-              />
-            )}
-            {activeTab === 'clients' && (
-              <ClientsTab 
-                clients={clients} 
-                onAdd={handleAddClient}
-                onUpdate={handleUpdateClient}
-                onDelete={handleDeleteClient}
-              />
-            )}
-            {activeTab === 'projects' && (
-              <ProjectsTab 
-                clients={clients} 
-                projects={projects} 
-                installments={installments}
-                onAdd={handleAddProject}
-                onUpdate={handleUpdateProject}
-                onDelete={handleDeleteProject}
-                onToggleInstallment={handleToggleInstallment}
-                onUpdateInstallment={handleUpdateInstallment}
-              />
-            )}
-            {activeTab === 'finance' && (
-              <FinanceTab 
-                projects={projects} 
-                clients={clients}
-                expenses={expenses} 
-                allInstallments={Object.values(installments).flat()}
-                onAddExpense={handleAddExpense}
-                onUpdateExpense={handleUpdateExpense}
-                onDeleteExpense={handleDeleteExpense}
-              />
-            )}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col">
+          <div className="max-w-7xl mx-auto w-full min-h-full flex flex-col">
+            <div className="flex-1">
+              {activeTab === 'dashboard' && (
+                <DashboardTab 
+                  clients={clients} 
+                  projects={projects} 
+                  expenses={expenses} 
+                  allInstallments={Object.values(installments).flat()} 
+                />
+              )}
+              {activeTab === 'clients' && (
+                <ClientsTab 
+                  clients={clients} 
+                  onAdd={handleAddClient}
+                  onUpdate={handleUpdateClient}
+                  onDelete={handleDeleteClient}
+                />
+              )}
+              {activeTab === 'projects' && (
+                <ProjectsTab 
+                  clients={clients} 
+                  projects={projects} 
+                  installments={installments}
+                  onAdd={handleAddProject}
+                  onUpdate={handleUpdateProject}
+                  onDelete={handleDeleteProject}
+                  onToggleInstallment={handleToggleInstallment}
+                  onUpdateInstallment={handleUpdateInstallment}
+                />
+              )}
+              {activeTab === 'finance' && (
+                <FinanceTab 
+                  projects={projects} 
+                  clients={clients}
+                  expenses={expenses} 
+                  allInstallments={Object.values(installments).flat()}
+                  onAddExpense={handleAddExpense}
+                  onUpdateExpense={handleUpdateExpense}
+                  onDeleteExpense={handleDeleteExpense}
+                />
+              )}
+            </div>
+
+            <footer className="mt-12 pb-8 border-t border-slate-200 pt-8 text-center">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-medium">
+                {isAnonymous ? 'Modo de Teste' : 'Office Control v1.0'}
+              </p>
+            </footer>
           </div>
         </main>
 

@@ -23,8 +23,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
     name: '',
     cpf: '',
     address: '',
-    contact: '',
-    email: ''
+    contact: ''
   });
 
   const filteredClients = clients.filter(c => 
@@ -49,12 +48,11 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
         name: client.name,
         cpf: formatCpfCnpj(client.cpf),
         address: client.address,
-        contact: formatPhone(client.contact),
-        email: client.email
+        contact: formatPhone(client.contact)
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: '', cpf: '', address: '', contact: '', email: '' });
+      setFormData({ name: '', cpf: '', address: '', contact: '' });
     }
     setIsModalOpen(true);
   };
@@ -76,8 +74,8 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
   };
 
   const handleExportPDF = () => {
-    const headers = ['Nome', 'CPF', 'Email', 'Contato'];
-    const rows = clients.map(c => [c.name, c.cpf, c.email, c.contact]);
+    const headers = ['Nome', 'CPF', 'Contato'];
+    const rows = clients.map(c => [c.name, c.cpf, c.contact]);
     exportToPDF('Relatório de Clientes', headers, rows, 'clientes');
   };
 
@@ -138,10 +136,6 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
             
             <div className="space-y-2">
               <div className="flex items-center text-sm text-slate-600">
-                <span className="w-20 font-medium text-slate-400 text-[10px] uppercase tracking-wider">Email</span>
-                <span className="truncate">{client.email}</span>
-              </div>
-              <div className="flex items-center text-sm text-slate-600">
                 <span className="w-20 font-medium text-slate-400 text-[10px] uppercase tracking-wider">Contato</span>
                 <span>{formatPhone(client.contact)}</span>
               </div>
@@ -199,16 +193,6 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                     type="text"
                     value={formData.contact}
                     onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Email</label>
-                  <input
-                    required
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
                   />
                 </div>

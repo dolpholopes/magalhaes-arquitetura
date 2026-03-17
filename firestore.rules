@@ -14,6 +14,9 @@
 // Collection: expenses
 // Fields: projectId (string, optional), description (string), amount (number), date (timestamp), category (string)
 //
+// Collection: contracts
+// Fields: clientId (string), contractNumber (string), status (string), totalValue (number), description (string), createdAt (timestamp)
+//
 // Collection: settings
 // Fields: reminderDays (number), reminderMessageTemplate (string)
 //
@@ -71,6 +74,13 @@ service cloud.firestore {
              data.amount is number && data.amount >= 0;
     }
 
+    function isValidContract(data) {
+      return data.clientId is string && data.clientId.size() > 0 &&
+             data.contractNumber is string && data.contractNumber.size() > 0 &&
+             data.status in ['active', 'completed', 'cancelled', 'draft'] &&
+             data.totalValue is number && data.totalValue >= 0;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -91,6 +101,10 @@ service cloud.firestore {
       }
 
       match /expenses/{expenseId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      match /contracts/{contractId} {
         allow read, write: if isAuthenticated() && request.auth.uid == userId;
       }
     }

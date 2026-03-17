@@ -1,19 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { formatDate } from '../utils/date';
-import { Client, Project, Expense, Installment } from '../types';
-import { Users, Briefcase, AlertCircle, CheckCircle2, Clock, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Client, Project, Expense, Installment, Contract } from '../types';
+import { Users, Briefcase, AlertCircle, CheckCircle2, Clock, TrendingUp, ArrowUpRight, ArrowDownRight, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { format, isAfter, isBefore, addDays, startOfDay, endOfDay } from 'date-fns';
 
 interface Props {
   clients: Client[];
   projects: Project[];
+  contracts: Contract[];
   expenses: Expense[];
   allInstallments: Installment[];
 }
 
-export function DashboardTab({ clients, projects, expenses, allInstallments }: Props) {
+export function DashboardTab({ clients, projects, contracts, expenses, allInstallments }: Props) {
+  const [financeSlide, setFinanceSlide] = useState(0);
+  const [activeSlide, setActiveSlide] = useState(0);
+
   const activeProjects = projects.filter(p => p.status === 'active');
+  const recentContracts = [...contracts].sort((a, b) => {
+    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any).toMillis();
+    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any).toMillis();
+    return dateB - dateA;
+  }).slice(0, 5);
+  const recentClients = [...clients].sort((a, b) => {
+    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any).toMillis();
+    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any).toMillis();
+    return dateB - dateA;
+  }).slice(0, 5);
+
   const totalRevenue = allInstallments.filter(i => i.status === 'paid').reduce((acc, i) => acc + i.amount, 0);
   const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
   
@@ -34,6 +49,183 @@ export function DashboardTab({ clients, projects, expenses, allInstallments }: P
       const date = i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate();
       return i.status === 'pending' && isBefore(date, startOfDay(new Date()));
     });
+
+  const financeSlides = [
+    {
+      id: 'upcoming',
+      title: 'Próximos Vencimentos',
+      icon: <Clock className="h-4 w-4 text-slate-400" />,
+      content: (
+        <div className="divide-y divide-slate-100">
+          {upcomingPayments.length > 0 ? upcomingPayments.map(inst => {
+            const project = projects.find(p => p.id === inst.projectId);
+            const client = clients.find(c => c.id === project?.clientId);
+            return (
+              <div key={inst.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-bold">
+                    {format(inst.dueDate instanceof Date ? inst.dueDate : inst.dueDate.toDate(), 'dd')}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{project?.name}</p>
+                    <p className="text-[10px] text-slate-500">{client?.name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-slate-900">R$ {inst.amount.toLocaleString('pt-BR')}</p>
+                  <p className="text-[10px] text-slate-600 font-bold uppercase">{formatDate(inst.dueDate)}</p>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-8 text-center text-slate-400 text-sm">Nenhum pagamento próximo.</div>
+          )}
+        </div>
+      )
+    },
+    {
+      id: 'overdue',
+      title: 'Atenção Necessária',
+      icon: <AlertCircle className="h-4 w-4 text-red-400" />,
+      content: (
+        <div className="divide-y divide-slate-100">
+          {overduePayments.length > 0 ? overduePayments.map(inst => {
+            const project = projects.find(p => p.id === inst.projectId);
+            const client = clients.find(c => c.id === project?.clientId);
+            return (
+              <div key={inst.id} className="p-4 flex items-center justify-between bg-red-50/30">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center font-bold">
+                    !
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{project?.name}</p>
+                    <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Atrasado</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-red-600">R$ {inst.amount.toLocaleString('pt-BR')}</p>
+                  <p className="text-[10px] text-slate-500">{client?.name}</p>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+              <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+              <span>Tudo em dia! Nenhuma parcela atrasada.</span>
+            </div>
+          )}
+        </div>
+      )
+    }
+  ];
+
+  const activeSlides = [
+    {
+      id: 'projects',
+      title: 'Projetos Ativos',
+      icon: <Briefcase className="h-4 w-4 text-blue-400" />,
+      content: (
+        <div className="divide-y divide-slate-100">
+          {activeProjects.length > 0 ? activeProjects.slice(0, 5).map(project => {
+            const client = clients.find(c => c.id === project.clientId);
+            return (
+              <div key={project.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold">
+                    <Briefcase className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{project.name}</p>
+                    <p className="text-[10px] text-slate-500">{client?.name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-slate-900">R$ {project.totalValue.toLocaleString('pt-BR')}</p>
+                  <p className="text-[10px] text-blue-600 font-bold uppercase">Ativo</p>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-8 text-center text-slate-400 text-sm">Nenhum projeto ativo.</div>
+          )}
+        </div>
+      )
+    },
+    {
+      id: 'contracts',
+      title: 'Contratos',
+      icon: <FileText className="h-4 w-4 text-amber-400" />,
+      content: (
+        <div className="divide-y divide-slate-100">
+          {recentContracts.length > 0 ? recentContracts.map(contract => {
+            const client = clients.find(c => c.id === contract.clientId);
+            const statusColors = {
+              active: 'text-amber-600 bg-amber-50',
+              completed: 'text-emerald-600 bg-emerald-50',
+              cancelled: 'text-red-600 bg-red-50',
+              draft: 'text-slate-600 bg-slate-50'
+            };
+            const statusLabels = {
+              active: 'Ativo',
+              completed: 'Concluído',
+              cancelled: 'Cancelado',
+              draft: 'Rascunho'
+            };
+            return (
+              <div key={contract.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className={`h-10 w-10 ${statusColors[contract.status]} rounded-xl flex items-center justify-center font-bold`}>
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">#{contract.contractNumber}</p>
+                    <p className="text-[10px] text-slate-500">{client?.name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-slate-900">R$ {contract.totalValue.toLocaleString('pt-BR')}</p>
+                  <p className={`text-[10px] font-bold uppercase ${statusColors[contract.status].split(' ')[0]}`}>
+                    {statusLabels[contract.status]}
+                  </p>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-8 text-center text-slate-400 text-sm">Nenhum contrato cadastrado.</div>
+          )}
+        </div>
+      )
+    },
+    {
+      id: 'clients',
+      title: 'Últimos Clientes',
+      icon: <Users className="h-4 w-4 text-emerald-400" />,
+      content: (
+        <div className="divide-y divide-slate-100">
+          {recentClients.length > 0 ? recentClients.map(client => (
+            <div key={client.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-bold">
+                  {client.name.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{client.name}</p>
+                  <p className="text-[10px] text-slate-500">{client.contact}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Cadastrado em</p>
+                <p className="text-xs text-slate-600">{formatDate(client.createdAt)}</p>
+              </div>
+            </div>
+          )) : (
+            <div className="p-8 text-center text-slate-400 text-sm">Nenhum cliente cadastrado.</div>
+          )}
+        </div>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-8">
@@ -75,72 +267,67 @@ export function DashboardTab({ clients, projects, expenses, allInstallments }: P
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Upcoming Payments */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Finance Carousel */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Próximos Vencimentos</h3>
-            <Clock className="h-4 w-4 text-slate-400" />
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{financeSlides[financeSlide].title}</h3>
+              {financeSlides[financeSlide].icon}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setFinanceSlide(prev => (prev - 1 + financeSlides.length) % financeSlides.length)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4 text-slate-400" />
+              </button>
+              <div className="flex gap-1">
+                {financeSlides.map((_, i) => (
+                  <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === financeSlide ? 'bg-slate-900' : 'bg-slate-200'}`} />
+                ))}
+              </div>
+              <button 
+                onClick={() => setFinanceSlide(prev => (prev + 1) % financeSlides.length)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+            </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {upcomingPayments.length > 0 ? upcomingPayments.map(inst => {
-              const project = projects.find(p => p.id === inst.projectId);
-              const client = clients.find(c => c.id === project?.clientId);
-              return (
-                <div key={inst.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-bold">
-                      {format(inst.dueDate instanceof Date ? inst.dueDate : inst.dueDate.toDate(), 'dd')}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{project?.name}</p>
-                      <p className="text-[10px] text-slate-500">{client?.name}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-slate-900">R$ {inst.amount.toLocaleString('pt-BR')}</p>
-                    <p className="text-[10px] text-slate-600 font-bold uppercase">{formatDate(inst.dueDate)}</p>
-                  </div>
-                </div>
-              );
-            }) : (
-              <div className="p-8 text-center text-slate-400 text-sm">Nenhum pagamento próximo.</div>
-            )}
+          <div className="flex-1 min-h-[300px]">
+            {financeSlides[financeSlide].content}
           </div>
         </div>
 
-        {/* Recent Activity / Overdue */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Active Items Carousel */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Atenção Necessária</h3>
-            <AlertCircle className="h-4 w-4 text-red-400" />
-          </div>
-          <div className="divide-y divide-slate-100">
-            {overduePayments.length > 0 ? overduePayments.map(inst => {
-              const project = projects.find(p => p.id === inst.projectId);
-              const client = clients.find(c => c.id === project?.clientId);
-              return (
-                <div key={inst.id} className="p-4 flex items-center justify-between bg-red-50/30">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center font-bold">
-                      !
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{project?.name}</p>
-                      <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Atrasado</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-black text-red-600">R$ {inst.amount.toLocaleString('pt-BR')}</p>
-                    <p className="text-[10px] text-slate-500">{client?.name}</p>
-                  </div>
-                </div>
-              );
-            }) : (
-              <div className="p-8 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                <span>Tudo em dia! Nenhuma parcela atrasada.</span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{activeSlides[activeSlide].title}</h3>
+              {activeSlides[activeSlide].icon}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setActiveSlide(prev => (prev - 1 + activeSlides.length) % activeSlides.length)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4 text-slate-400" />
+              </button>
+              <div className="flex gap-1">
+                {activeSlides.map((_, i) => (
+                  <div key={i} className={`h-1 w-4 rounded-full transition-colors ${i === activeSlide ? 'bg-slate-900' : 'bg-slate-200'}`} />
+                ))}
               </div>
-            )}
+              <button 
+                onClick={() => setActiveSlide(prev => (prev + 1) % activeSlides.length)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <ChevronRight className="h-4 w-4 text-slate-400" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-[300px]">
+            {activeSlides[activeSlide].content}
           </div>
         </div>
       </div>

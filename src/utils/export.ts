@@ -5,20 +5,13 @@ import { format } from 'date-fns';
 export const exportToPDF = (title: string, headers: string[], rows: any[][], filename: string) => {
   const doc = new jsPDF();
   
-  // Logo "JM"
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(24);
-  doc.setTextColor(203, 213, 225); // slate-300 (M)
-  doc.text('M', 18, 20);
-  doc.setTextColor(15, 23, 42); // slate-900 (J)
-  doc.text('J', 14, 18);
-  
   // Text "Magalhães Arquitetura"
-  doc.setFontSize(12);
-  doc.setTextColor(30, 41, 59); // slate-800
-  doc.text('MAGALHÃES', 28, 16);
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.setFont('helvetica', 'normal');
+  doc.text('MAGALHÃES', 14, 16);
   doc.setFont('helvetica', 'bold');
-  doc.text('ARQUITETURA', 28, 21);
+  doc.text('ARQUITETURA', 14, 22);
 
   // Divider line
   doc.setDrawColor(226, 232, 240); // slate-200

@@ -8,7 +8,7 @@ import { auth, signIn, logOut, db, handleFirestoreError, OperationType, signInAn
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, updateDoc, deleteDoc, Timestamp, where, getDocs, writeBatch } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { LayoutDashboard, Users, Briefcase, DollarSign, Settings as SettingsIcon, LogOut, LogIn } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, DollarSign, Settings as SettingsIcon, LogOut, LogIn, FileText } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -17,9 +17,10 @@ import { ClientsTab } from './components/ClientsTab';
 import { ProjectsTab } from './components/ProjectsTab';
 import { FinanceTab } from './components/FinanceTab';
 import { DashboardTab } from './components/DashboardTab';
+import { ContractsTab } from './components/ContractsTab';
 import { Logo } from './components/Logo';
 
-import { Client, Project, Expense, Installment } from './types';
+import { Client, Project, Expense, Installment, Contract } from './types';
 import { addMonths } from 'date-fns';
 
 function cn(...inputs: ClassValue[]) {
@@ -33,6 +34,7 @@ export default function App() {
   
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [installments, setInstallments] = useState<Record<string, Installment[]>>({});
 
@@ -119,6 +121,36 @@ export default function App() {
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/projects/${id}`);
+    }
+  };
+
+  const handleAddContract = async (data: Omit<Contract, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    try {
+      await addDoc(collection(db, `users/${user.uid}/contracts`), {
+        ...data,
+        createdAt: Timestamp.now()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/contracts`);
+    }
+  };
+
+  const handleUpdateContract = async (id: string, data: Partial<Contract>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, `users/${user.uid}/contracts/${id}`), data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/contracts/${id}`);
+    }
+  };
+
+  const handleDeleteContract = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, `users/${user.uid}/contracts/${id}`));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/contracts/${id}`);
     }
   };
 
@@ -245,11 +277,17 @@ export default function App() {
       setInstallments(grouped);
     }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/installments`));
 
+    const contractsRef = collection(db, `users/${user.uid}/contracts`);
+    const unsubContracts = onSnapshot(query(contractsRef, orderBy('createdAt', 'desc')), (snapshot) => {
+      setContracts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract)));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/contracts`));
+
     return () => {
       unsubClients();
       unsubProjects();
       unsubExpenses();
       unsubInstallments();
+      unsubContracts();
     };
   }, [user]);
 
@@ -265,6 +303,7 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'clients', label: 'Clientes', icon: Users },
     { id: 'projects', label: 'Projetos', icon: Briefcase },
+    { id: 'contracts', label: 'Contratos', icon: FileText },
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
   ];
 
@@ -364,6 +403,7 @@ export default function App() {
                 <DashboardTab 
                   clients={clients} 
                   projects={projects} 
+                  contracts={contracts}
                   expenses={expenses} 
                   allInstallments={Object.values(installments).flat()} 
                 />
@@ -397,6 +437,15 @@ export default function App() {
                   onAddExpense={handleAddExpense}
                   onUpdateExpense={handleUpdateExpense}
                   onDeleteExpense={handleDeleteExpense}
+                />
+              )}
+              {activeTab === 'contracts' && (
+                <ContractsTab 
+                  contracts={contracts} 
+                  clients={clients}
+                  onAdd={handleAddContract}
+                  onUpdate={handleUpdateContract}
+                  onDelete={handleDeleteContract}
                 />
               )}
             </div>

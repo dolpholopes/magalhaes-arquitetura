@@ -62,6 +62,20 @@
         "reminderDays": { "type": "number" },
         "reminderMessageTemplate": { "type": "string" }
       }
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "A contract linked to a client",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string", "description": "ID of the client" },
+        "contractNumber": { "type": "string", "description": "Contract number" },
+        "status": { "type": "string", "enum": ["active", "completed", "cancelled", "draft"] },
+        "totalValue": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "contractNumber", "status", "totalValue"]
     }
   },
   "firestore": {
@@ -69,6 +83,7 @@
     "/users/{userId}/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },
     "/users/{userId}/installments/{installmentId}": { "schema": "Installment", "description": "Installments for a project" },
     "/users/{userId}/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses collection" },
+    "/users/{userId}/contracts/{contractId}": { "schema": "Contract", "description": "Contracts collection" },
     "/users/{userId}/settings/global": { "schema": "Settings", "description": "Global settings" }
   }
 }

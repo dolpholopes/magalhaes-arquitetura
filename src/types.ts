@@ -35,3 +35,13 @@ export interface Expense {
   date: any;
   category: string;
 }
+
+export interface Contract {
+  id: string;
+  clientId: string;
+  contractNumber: string;
+  status: 'active' | 'completed' | 'cancelled' | 'draft';
+  createdAt: any;
+  totalValue: number;
+  description?: string;
+}

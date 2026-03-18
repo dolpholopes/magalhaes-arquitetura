@@ -336,8 +336,8 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F4]">
-        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-200 text-center max-w-sm w-full mx-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F4] p-4">
+        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-200 text-center max-w-sm w-full">
           <Logo className="w-16 h-16 mx-auto mb-6 text-slate-900" />
           <h1 className="text-xl font-light tracking-[0.15em] uppercase text-slate-800 leading-tight mb-8">
             Magalhães<br />
@@ -350,6 +350,10 @@ export default function App() {
             <LogIn className="h-5 w-5" />
             <span>Entrar com Google</span>
           </button>
+        </div>
+        
+        <div className="mt-8 text-center text-[10px] text-slate-300 font-montserrat uppercase tracking-widest select-none">
+          © 2023 - 2026. Todos direitos reservados a RR Sistemas.
         </div>
       </div>
     );
@@ -484,11 +488,9 @@ export default function App() {
               )}
             </div>
 
-            <footer className="mt-12 pb-8 border-t border-slate-200 pt-8 text-center">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-medium">
-                {isAnonymous ? 'Modo de Teste' : 'Office Control v1.0'}
-              </p>
-            </footer>
+            <div className="mt-8 text-center text-[10px] text-slate-300 font-montserrat uppercase tracking-widest select-none">
+              © 2023 - 2026. Todos direitos reservados a RR Sistemas.
+            </div>
           </div>
         </main>
 

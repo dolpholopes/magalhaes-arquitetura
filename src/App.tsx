@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, signIn, logOut, db, handleFirestoreError, OperationType, signInAnon } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, updateDoc, deleteDoc, Timestamp, where, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, getDocFromServer, addDoc, setDoc, updateDoc, deleteDoc, Timestamp, where, getDocs, writeBatch } from 'firebase/firestore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LayoutDashboard, Users, Briefcase, DollarSign, Settings as SettingsIcon, LogOut, LogIn, FileText } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -18,9 +18,10 @@ import { ProjectsTab } from './components/ProjectsTab';
 import { FinanceTab } from './components/FinanceTab';
 import { DashboardTab } from './components/DashboardTab';
 import { ContractsTab } from './components/ContractsTab';
+import { SettingsTab } from './components/SettingsTab';
 import { Logo } from './components/Logo';
 
-import { Client, Project, Expense, Installment, Contract } from './types';
+import { Client, Project, Expense, Installment, Contract, Settings } from './types';
 import { addMonths } from 'date-fns';
 
 function cn(...inputs: ClassValue[]) {
@@ -37,6 +38,7 @@ export default function App() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [installments, setInstallments] = useState<Record<string, Installment[]>>({});
+  const [settings, setSettings] = useState<Settings>({ expenseCategories: ['Geral', 'Aluguel', 'Salários', 'Marketing', 'Software', 'Impostos'] });
 
   // Firestore CRUD Handlers
   const handleAddClient = async (data: Omit<Client, 'id' | 'createdAt'>) => {
@@ -239,6 +241,18 @@ export default function App() {
     }
   };
 
+  const handleUpdateSettings = async (data: Partial<Settings>) => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, `users/${user.uid}/settings/general`), {
+        ...settings,
+        ...data
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/settings/general`);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -282,12 +296,24 @@ export default function App() {
       setContracts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contract)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/contracts`));
 
+    const settingsRef = doc(db, `users/${user.uid}/settings/general`);
+    const unsubSettings = onSnapshot(settingsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setSettings(snapshot.data() as Settings);
+      } else {
+        setDoc(settingsRef, {
+          expenseCategories: ['Geral', 'Aluguel', 'Salários', 'Marketing', 'Software', 'Impostos']
+        });
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, `users/${user.uid}/settings/general`));
+
     return () => {
       unsubClients();
       unsubProjects();
       unsubExpenses();
       unsubInstallments();
       unsubContracts();
+      unsubSettings();
     };
   }, [user]);
 
@@ -305,6 +331,7 @@ export default function App() {
     { id: 'projects', label: 'Projetos', icon: Briefcase },
     { id: 'contracts', label: 'Contratos', icon: FileText },
     { id: 'finance', label: 'Financeiro', icon: DollarSign },
+    { id: 'settings', label: 'Configurações', icon: SettingsIcon },
   ];
 
   if (!user) {
@@ -434,6 +461,7 @@ export default function App() {
                   clients={clients}
                   expenses={expenses} 
                   allInstallments={Object.values(installments).flat()}
+                  expenseCategories={settings.expenseCategories}
                   onAddExpense={handleAddExpense}
                   onUpdateExpense={handleUpdateExpense}
                   onDeleteExpense={handleDeleteExpense}
@@ -446,6 +474,12 @@ export default function App() {
                   onAdd={handleAddContract}
                   onUpdate={handleUpdateContract}
                   onDelete={handleDeleteContract}
+                />
+              )}
+              {activeTab === 'settings' && (
+                <SettingsTab 
+                  settings={settings}
+                  onUpdate={handleUpdateSettings}
                 />
               )}
             </div>

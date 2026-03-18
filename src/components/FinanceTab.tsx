@@ -116,12 +116,13 @@ interface Props {
   clients: Client[];
   expenses: Expense[];
   allInstallments: Installment[];
+  expenseCategories: string[];
   onAddExpense: (data: Omit<Expense, 'id'>) => void;
   onUpdateExpense: (id: string, data: Partial<Expense>) => void;
   onDeleteExpense: (id: string) => void;
 }
 
-export function FinanceTab({ projects, clients, expenses, allInstallments, onAddExpense, onUpdateExpense, onDeleteExpense }: Props) {
+export function FinanceTab({ projects, clients, expenses, allInstallments, expenseCategories, onAddExpense, onUpdateExpense, onDeleteExpense }: Props) {
   const [dateFilter, setDateFilter] = useState({
     start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
@@ -165,7 +166,9 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
   });
 
   const filteredInstallments = allInstallments.filter(i => {
-    const date = i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate();
+    const date = (i.status === 'paid' && i.paidAt) 
+      ? (i.paidAt instanceof Date ? i.paidAt : (i.paidAt as any).toDate())
+      : (i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate());
     const isWithinDate = isWithinInterval(date, { 
       start: parseISO(dateFilter.start), 
       end: parseISO(dateFilter.end) 
@@ -216,16 +219,97 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
   };
 
   const handleExportPDF = () => {
-    const headers = ['Descrição', 'Valor', 'Data', 'Categoria', 'Projeto'];
-    const rows = filteredExpenses.map(e => [
-      e.description,
-      `R$ ${e.amount.toLocaleString('pt-BR')}`,
+    const headers = ['Vencimento', 'Pagamento', 'Tipo', 'Descrição/Projeto', 'Categoria', 'Valor'];
+    
+    // Process Revenues (Installments)
+    const revenueRows = filteredInstallments
+      .filter(i => i.status === 'paid')
+      .map(i => [
+        formatDate(i.dueDate),
+        i.paidAt ? formatDate(i.paidAt) : '-',
+        'Receita',
+        projects.find(p => p.id === i.projectId)?.name || 'Projeto não encontrado',
+        'Recebimento',
+        `+ R$ ${i.amount.toLocaleString('pt-BR')}`
+      ]);
+
+    // Process Expenses
+    const expenseRows = filteredExpenses.map(e => [
       formatDate(e.date),
+      formatDate(e.date),
+      'Despesa',
+      e.description,
       e.category,
-      projects.find(p => p.id === e.projectId)?.name || 'Geral'
+      `- R$ ${e.amount.toLocaleString('pt-BR')}`
     ]);
-    exportToPDF('Relatório Financeiro', headers, rows, 'financeiro');
+
+    // Combine and sort by date (using payment date for revenues if available, else due date)
+    const allRows = [...revenueRows, ...expenseRows].sort((a, b) => {
+      // Use the second column (Pagamento) for sorting if it's not '-', otherwise use the first (Vencimento)
+      const dateStrA = a[1] !== '-' ? a[1] : a[0];
+      const dateStrB = b[1] !== '-' ? b[1] : b[0];
+      const dateA = dateStrA.split('/').reverse().join('');
+      const dateB = dateStrB.split('/').reverse().join('');
+      return dateA.localeCompare(dateB);
+    });
+
+    // Add summary rows
+    allRows.push(['', '', '', '', '', '']); // Spacer
+    allRows.push([
+      '', 
+      '', 
+      '',
+      'RESUMO DO PERÍODO', 
+      'Total Receitas:', 
+      `+ R$ ${totalRevenue.toLocaleString('pt-BR')}`
+    ]);
+    allRows.push([
+      '', 
+      '', 
+      '',
+      '', 
+      'Total Despesas:', 
+      `- R$ ${totalExpenses.toLocaleString('pt-BR')}`
+    ]);
+    allRows.push([
+      '', 
+      '', 
+      '',
+      '', 
+      'Saldo Líquido:', 
+      `${balance >= 0 ? '+ ' : ''}R$ ${balance.toLocaleString('pt-BR')}`
+    ]);
+
+    const periodTitle = `Relatório Financeiro (${formatDate(parseISO(dateFilter.start))} - ${formatDate(parseISO(dateFilter.end))})`;
+    exportToPDF(periodTitle, headers, allRows, 'financeiro_completo', 'l');
   };
+
+  const combinedHistory = [
+    ...filteredInstallments.filter(i => i.status === 'paid').map(i => ({
+      id: i.id,
+      date: i.paidAt || i.dueDate,
+      dueDate: i.dueDate,
+      paidAt: i.paidAt,
+      description: projects.find(p => p.id === i.projectId)?.name || 'Projeto não encontrado',
+      category: 'Recebimento',
+      amount: i.amount,
+      type: 'revenue' as const
+    })),
+    ...filteredExpenses.map(e => ({
+      id: e.id,
+      date: e.date,
+      dueDate: e.date,
+      paidAt: e.date,
+      description: e.description,
+      category: e.category,
+      amount: e.amount,
+      type: 'expense' as const
+    }))
+  ].sort((a, b) => {
+    const dateA = (a.date instanceof Date ? a.date : (a.date as any).toDate()).getTime();
+    const dateB = (b.date instanceof Date ? b.date : (b.date as any).toDate()).getTime();
+    return dateB - dateA;
+  });
 
   return (
     <div className="space-y-6">
@@ -449,45 +533,56 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
           </div>
         </div>
 
-        {/* Expenses Table */}
+        {/* Financial History Table */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Histórico de Despesas</h3>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Histórico Financeiro</h3>
             <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-              {filteredExpenses.length} registros
+              {combinedHistory.length} registros
             </span>
           </div>
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left border-collapse min-w-[500px]">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Data</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Vencimento</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Pagamento</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Descrição</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredExpenses.length > 0 ? (
-                  filteredExpenses.map(e => (
-                    <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 text-xs text-slate-600 whitespace-nowrap">{formatDate(e.date)}</td>
-                      <td className="p-4 text-xs font-medium text-slate-900">
-                        <div className="truncate max-w-[150px]" title={e.description}>{e.description}</div>
-                        <div className="text-[9px] text-slate-400 uppercase tracking-tighter">{e.category}</div>
+                {combinedHistory.length > 0 ? (
+                  combinedHistory.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="p-4 text-xs text-slate-600 whitespace-nowrap">{formatDate(item.dueDate)}</td>
+                      <td className="p-4 text-xs text-slate-600 whitespace-nowrap">
+                        {item.paidAt ? formatDate(item.paidAt) : '-'}
                       </td>
-                      <td className="p-4 text-xs font-bold text-red-600 whitespace-nowrap">R$ {e.amount.toLocaleString('pt-BR')}</td>
+                      <td className="p-4 text-xs font-medium text-slate-900">
+                        <div className="truncate max-w-[150px]" title={item.description}>{item.description}</div>
+                        <div className="text-[9px] text-slate-400 uppercase tracking-tighter">{item.category}</div>
+                      </td>
+                      <td className={cn(
+                        "p-4 text-xs font-bold whitespace-nowrap",
+                        item.type === 'revenue' ? "text-emerald-600" : "text-red-600"
+                      )}>
+                        {item.type === 'revenue' ? '+' : '-'} R$ {item.amount.toLocaleString('pt-BR')}
+                      </td>
                       <td className="p-4">
-                        <button onClick={() => handleDeleteExpenseClick(e.id)} className="p-2 text-slate-400 hover:text-red-600 transition-colors">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {item.type === 'expense' && (
+                          <button onClick={() => handleDeleteExpenseClick(item.id)} className="p-2 text-slate-400 hover:text-red-600 transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="p-12 text-center text-slate-400 text-sm italic">
-                      Nenhuma despesa encontrada para este período.
+                    <td colSpan={5} className="p-12 text-center text-slate-400 text-sm italic">
+                      Nenhum registro encontrado para este período.
                     </td>
                   </tr>
                 )}
@@ -552,12 +647,9 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, onAdd
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
                 >
-                  <option value="Geral">Geral</option>
-                  <option value="Aluguel">Aluguel</option>
-                  <option value="Salários">Salários</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Software">Software</option>
-                  <option value="Impostos">Impostos</option>
+                  {expenseCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-1">

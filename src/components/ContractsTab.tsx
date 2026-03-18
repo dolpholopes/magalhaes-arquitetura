@@ -122,10 +122,10 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
       c.contractNumber,
       clients.find(cl => cl.id === c.clientId)?.name || 'N/A',
       `R$ ${c.totalValue.toLocaleString('pt-BR')}`,
-      c.status,
+      c.status === 'active' ? 'Ativo' : c.status === 'completed' ? 'Concluído' : c.status === 'cancelled' ? 'Cancelado' : 'Rascunho',
       formatDate(c.createdAt)
     ]);
-    exportToPDF('Relatório de Contratos', headers, rows, 'contratos');
+    exportToPDF('Relatório de Contratos', headers, rows, 'contratos', 'l');
   };
 
   return (

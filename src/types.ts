@@ -45,3 +45,8 @@ export interface Contract {
   totalValue: number;
   description?: string;
 }
+
+export interface Settings {
+  expenseCategories: string[];
+  officeName?: string;
+}

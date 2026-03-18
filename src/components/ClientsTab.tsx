@@ -74,9 +74,9 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
   };
 
   const handleExportPDF = () => {
-    const headers = ['Nome', 'CPF', 'Contato'];
-    const rows = clients.map(c => [c.name, c.cpf, c.contact]);
-    exportToPDF('Relatório de Clientes', headers, rows, 'clientes');
+    const headers = ['Nome', 'CPF', 'Contato', 'Endereço'];
+    const rows = clients.map(c => [c.name, c.cpf, c.contact, c.address]);
+    exportToPDF('Relatório de Clientes', headers, rows, 'clientes', 'l');
   };
 
   return (

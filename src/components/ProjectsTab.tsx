@@ -33,6 +33,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [editingInstallmentId, setEditingInstallmentId] = useState<string | null>(null);
   const [editingInstallmentDateId, setEditingInstallmentDateId] = useState<string | null>(null);
+  const [editingPaidAtId, setEditingPaidAtId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<Project['status'] | 'all'>('all');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
@@ -151,6 +152,15 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
     });
   };
 
+  const handlePaidAtChange = (project: Project, installment: Installment, newDateStr: string) => {
+    if (!newDateStr) return;
+    const [year, month, day] = newDateStr.split('-').map(Number);
+    const newDate = new Date(year, month - 1, day);
+    onUpdateInstallment(project.id, installment.id, { 
+      paidAt: newDate as any
+    });
+  };
+
   const getProjectProgress = (projectId: string) => {
     const projectInstallments = installments[projectId] || [];
     if (projectInstallments.length === 0) return 0;
@@ -164,10 +174,10 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
       p.name, 
       clients.find(c => c.id === p.clientId)?.name || 'N/A',
       `R$ ${p.totalValue.toLocaleString('pt-BR')}`,
-      p.status,
+      p.status === 'active' ? 'Em Andamento' : p.status === 'completed' ? 'Concluído' : 'Cancelado',
       `${getProjectProgress(p.id)}%`
     ]);
-    exportToPDF('Relatório de Projetos', headers, rows, 'projetos');
+    exportToPDF('Relatório de Projetos', headers, rows, 'projetos', 'l');
   };
 
   return (
@@ -345,6 +355,29 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
                               >
                                 Vence em {formatDate(inst.dueDate)}
                               </button>
+                            )}
+                            {inst.status === 'paid' && (
+                              <div className="mt-1">
+                                {editingPaidAtId === inst.id ? (
+                                  <input 
+                                    type="date"
+                                    className="text-[10px] border border-slate-200 rounded px-1 outline-none focus:ring-1 focus:ring-slate-500"
+                                    value={formatDateForInput(inst.paidAt)}
+                                    onChange={(e) => handlePaidAtChange(project, inst, e.target.value)}
+                                    onBlur={() => setEditingPaidAtId(null)}
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingPaidAtId(null)}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <button 
+                                    onClick={() => setEditingPaidAtId(inst.id)}
+                                    className="text-[10px] text-emerald-600 font-bold hover:underline text-left flex items-center gap-1"
+                                    title="Clique para alterar a data de pagamento"
+                                  >
+                                    Pago em {formatDate(inst.paidAt)}
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>

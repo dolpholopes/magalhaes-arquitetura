@@ -24,6 +24,8 @@ import { Logo } from './components/Logo';
 import { Client, Project, Expense, Installment, Contract, Settings } from './types';
 import { addMonths } from 'date-fns';
 
+import { Modal } from './components/Modal';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -39,6 +41,7 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [installments, setInstallments] = useState<Record<string, Installment[]>>({});
   const [settings, setSettings] = useState<Settings>({ expenseCategories: ['Geral', 'Aluguel', 'Salários', 'Marketing', 'Software', 'Impostos'] });
+  const [errorModal, setErrorModal] = useState<{ isOpen: boolean, title: string, description: string } | null>(null);
 
   // Firestore CRUD Handlers
   const handleAddClient = async (data: Omit<Client, 'id' | 'createdAt'>) => {
@@ -253,6 +256,122 @@ export default function App() {
     }
   };
 
+  const handleResetAndPopulate = async () => {
+    if (!user) return;
+    
+    try {
+      const collections = ['clients', 'projects', 'contracts', 'expenses', 'installments'];
+      
+      // Delete all existing data
+      for (const collName of collections) {
+        const collRef = collection(db, `users/${user.uid}/${collName}`);
+        const snapshot = await getDocs(collRef);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+
+      // Populate with sample data
+      // 1. Clients
+      const client1 = await addDoc(collection(db, `users/${user.uid}/clients`), {
+        name: 'Construtora Horizonte',
+        email: 'contato@horizonte.com.br',
+        phone: '(11) 98888-7777',
+        address: 'Av. Paulista, 1000 - São Paulo, SP',
+        createdAt: Timestamp.now()
+      });
+
+      const client2 = await addDoc(collection(db, `users/${user.uid}/clients`), {
+        name: 'Residencial Vila Verde',
+        email: 'adm@vilaverde.com.br',
+        phone: '(11) 97777-6666',
+        address: 'Rua das Flores, 500 - Campinas, SP',
+        createdAt: Timestamp.now()
+      });
+
+      // 2. Projects & Installments
+      // Project 1
+      const proj1Value = 15000;
+      const proj1Ref = await addDoc(collection(db, `users/${user.uid}/projects`), {
+        clientId: client1.id,
+        name: 'Reforma Apartamento 402',
+        description: 'Reforma completa da área social e cozinha.',
+        totalValue: proj1Value,
+        status: 'active',
+        createdAt: Timestamp.now()
+      });
+
+      for (let i = 0; i < 3; i++) {
+        await addDoc(collection(db, `users/${user.uid}/installments`), {
+          projectId: proj1Ref.id,
+          amount: proj1Value / 3,
+          percentage: 33.33,
+          dueDate: Timestamp.fromDate(addMonths(new Date(), i)),
+          status: i === 0 ? 'paid' : 'pending',
+          paidAt: i === 0 ? Timestamp.now() : null
+        });
+      }
+
+      // Project 2
+      const proj2Value = 45000;
+      const proj2Ref = await addDoc(collection(db, `users/${user.uid}/projects`), {
+        clientId: client2.id,
+        name: 'Projeto Sede Corporativa',
+        description: 'Projeto arquitetônico e executivo para nova sede.',
+        totalValue: proj2Value,
+        status: 'active',
+        createdAt: Timestamp.now()
+      });
+
+      for (let i = 0; i < 5; i++) {
+        await addDoc(collection(db, `users/${user.uid}/installments`), {
+          projectId: proj2Ref.id,
+          amount: proj2Value / 5,
+          percentage: 20,
+          dueDate: Timestamp.fromDate(addMonths(new Date(), i)),
+          status: 'pending'
+        });
+      }
+
+      // 3. Expenses
+      const expenseCategories = settings.expenseCategories;
+      await addDoc(collection(db, `users/${user.uid}/expenses`), {
+        description: 'Aluguel Escritório',
+        amount: 3500,
+        category: expenseCategories[1] || 'Aluguel',
+        date: Timestamp.now(),
+        status: 'paid'
+      });
+
+      await addDoc(collection(db, `users/${user.uid}/expenses`), {
+        description: 'Software Adobe Creative Cloud',
+        amount: 250,
+        category: expenseCategories[4] || 'Software',
+        date: Timestamp.now(),
+        status: 'paid'
+      });
+
+      // 4. Contracts
+      await addDoc(collection(db, `users/${user.uid}/contracts`), {
+        clientId: client1.id,
+        title: 'Contrato de Prestação de Serviços - Horizonte',
+        content: 'Contrato referente ao projeto de reforma do apartamento 402...',
+        status: 'signed',
+        createdAt: Timestamp.now()
+      });
+
+    } catch (error) {
+      console.error("Error resetting and populating data:", error);
+      setErrorModal({
+        isOpen: true,
+        title: "Erro ao Resetar Dados",
+        description: "Ocorreu um problema ao tentar limpar e popular o banco de dados. Por favor, tente novamente ou verifique sua conexão."
+      });
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -364,6 +483,16 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-[#F5F5F4] flex flex-col md:flex-row pb-16 md:pb-0">
+        {errorModal && (
+          <Modal
+            isOpen={errorModal.isOpen}
+            onClose={() => setErrorModal(null)}
+            title={errorModal.title}
+            description={errorModal.description}
+            type="error"
+            confirmLabel="Entendido"
+          />
+        )}
         {/* Sidebar / Mobile Header */}
         <aside className="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-row md:flex-col justify-between md:justify-start md:sticky md:top-0 md:h-screen z-20">
           <div className="p-4 md:p-6 flex items-center justify-between md:justify-start w-full md:w-auto">
@@ -484,6 +613,7 @@ export default function App() {
                 <SettingsTab 
                   settings={settings}
                   onUpdate={handleUpdateSettings}
+                  onResetData={handleResetAndPopulate}
                 />
               )}
             </div>

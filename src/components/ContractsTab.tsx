@@ -62,8 +62,8 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
       end: parseISO(dateFilter.end) 
     });
     const client = clients.find(cl => cl.id === c.clientId);
-    const matchesSearch = c.contractNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (c.contractNumber || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+      (client?.name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
     const matchesClient = clientFilter === 'all' || c.clientId === clientFilter;
     return isWithinDate && matchesSearch && matchesStatus && matchesClient;
@@ -121,7 +121,7 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
     const rows = filteredContracts.map(c => [
       c.contractNumber,
       clients.find(cl => cl.id === c.clientId)?.name || 'N/A',
-      `R$ ${c.totalValue.toLocaleString('pt-BR')}`,
+      `R$ ${(c.totalValue || 0).toLocaleString('pt-BR')}`,
       c.status === 'active' ? 'Ativo' : c.status === 'completed' ? 'Concluído' : c.status === 'cancelled' ? 'Cancelado' : 'Rascunho',
       formatDate(c.createdAt)
     ]);
@@ -172,7 +172,7 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor Total</p>
-              <p className="text-2xl font-black text-slate-900">R$ {stats.totalValue.toLocaleString('pt-BR')}</p>
+              <p className="text-2xl font-black text-slate-900">R$ {(stats.totalValue || 0).toLocaleString('pt-BR')}</p>
             </div>
           </div>
         </div>
@@ -331,7 +331,7 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor</p>
-                    <p className="text-sm font-black text-slate-900">R$ {contract.totalValue.toLocaleString('pt-BR')}</p>
+                    <p className="text-sm font-black text-slate-900">R$ {(contract.totalValue || 0).toLocaleString('pt-BR')}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Criado em</p>
@@ -398,7 +398,7 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
                         </div>
                         <div className="overflow-y-auto flex-1">
                           {clients
-                            .filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()))
+                            .filter(c => (c.name || '').toLowerCase().includes((clientSearchTerm || '').toLowerCase()))
                             .map(c => (
                               <div
                                 key={c.id}

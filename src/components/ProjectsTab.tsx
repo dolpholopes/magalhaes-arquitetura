@@ -52,8 +52,8 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
   });
 
   const filteredProjects = projects.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      clients.find(c => c.id === p.clientId)?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
+      (clients.find(c => c.id === p.clientId)?.name || '').toLowerCase().includes((searchTerm || '').toLowerCase());
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -145,7 +145,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
 
   const handleDateChange = (project: Project, installment: Installment, newDateStr: string) => {
     if (!newDateStr) return;
-    const [year, month, day] = newDateStr.split('-').map(Number);
+    const [year, month, day] = (newDateStr || '').split('-').map(Number);
     const newDate = new Date(year, month - 1, day);
     onUpdateInstallment(project.id, installment.id, { 
       dueDate: newDate as any
@@ -154,7 +154,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
 
   const handlePaidAtChange = (project: Project, installment: Installment, newDateStr: string) => {
     if (!newDateStr) return;
-    const [year, month, day] = newDateStr.split('-').map(Number);
+    const [year, month, day] = (newDateStr || '').split('-').map(Number);
     const newDate = new Date(year, month - 1, day);
     onUpdateInstallment(project.id, installment.id, { 
       paidAt: newDate as any
@@ -173,7 +173,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
     const rows = projects.map(p => [
       p.name, 
       clients.find(c => c.id === p.clientId)?.name || 'N/A',
-      `R$ ${p.totalValue.toLocaleString('pt-BR')}`,
+      `R$ ${(p.totalValue || 0).toLocaleString('pt-BR')}`,
       p.status === 'active' ? 'Em Andamento' : p.status === 'completed' ? 'Concluído' : 'Cancelado',
       `${getProjectProgress(p.id)}%`
     ]);
@@ -254,7 +254,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
                 <div className="flex flex-col items-end gap-2">
                   <div className="text-right">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor Total</p>
-                    <p className="text-lg font-black text-slate-900">R$ {project.totalValue.toLocaleString('pt-BR')}</p>
+                    <p className="text-lg font-black text-slate-900">R$ {(project.totalValue || 0).toLocaleString('pt-BR')}</p>
                   </div>
                   <div className="w-full md:w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div 
@@ -382,7 +382,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end gap-2">
-                          <p className="text-sm font-bold text-slate-900">R$ {inst.amount.toLocaleString('pt-BR')}</p>
+                          <p className="text-sm font-bold text-slate-900">R$ {(inst.amount || 0).toLocaleString('pt-BR')}</p>
                           <button 
                             onClick={() => toggleInstallmentStatus(project.id, inst)}
                             className={cn(
@@ -479,7 +479,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
                         </div>
                         <div className="overflow-y-auto flex-1">
                           {clients
-                            .filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()))
+                            .filter(c => (c.name || '').toLowerCase().includes((clientSearchTerm || '').toLowerCase()))
                             .map(c => (
                               <div
                                 key={c.id}
@@ -496,7 +496,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
                                 {c.name}
                               </div>
                             ))}
-                          {clients.filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase())).length === 0 && (
+                          {clients.filter(c => (c.name || '').toLowerCase().includes((clientSearchTerm || '').toLowerCase())).length === 0 && (
                             <div className="px-4 py-3 text-sm text-slate-500 text-center">
                               Nenhum cliente encontrado
                             </div>

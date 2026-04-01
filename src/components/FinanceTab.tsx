@@ -34,7 +34,7 @@ function SearchableSelect({
   
   const selectedOption = options.find(o => o.id === value);
   const filteredOptions = options.filter(o => 
-    o.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (o.name || '').toLowerCase().includes((searchTerm || '').toLowerCase())
   );
 
   return (
@@ -230,7 +230,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
         'Receita',
         projects.find(p => p.id === i.projectId)?.name || 'Projeto não encontrado',
         'Recebimento',
-        `+ R$ ${i.amount.toLocaleString('pt-BR')}`
+        `+ R$ ${(i.amount || 0).toLocaleString('pt-BR')}`
       ]);
 
     // Process Expenses
@@ -240,7 +240,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       'Despesa',
       e.description,
       e.category,
-      `- R$ ${e.amount.toLocaleString('pt-BR')}`
+      `- R$ ${(e.amount || 0).toLocaleString('pt-BR')}`
     ]);
 
     // Combine and sort by date (using payment date for revenues if available, else due date)
@@ -248,8 +248,8 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       // Use the second column (Pagamento) for sorting if it's not '-', otherwise use the first (Vencimento)
       const dateStrA = a[1] !== '-' ? a[1] : a[0];
       const dateStrB = b[1] !== '-' ? b[1] : b[0];
-      const dateA = dateStrA.split('/').reverse().join('');
-      const dateB = dateStrB.split('/').reverse().join('');
+      const dateA = (dateStrA || '').split('/').reverse().join('');
+      const dateB = (dateStrB || '').split('/').reverse().join('');
       return dateA.localeCompare(dateB);
     });
 
@@ -261,7 +261,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       '',
       'RESUMO DO PERÍODO', 
       'Total Receitas:', 
-      `+ R$ ${totalRevenue.toLocaleString('pt-BR')}`
+      `+ R$ ${(totalRevenue || 0).toLocaleString('pt-BR')}`
     ]);
     allRows.push([
       '', 
@@ -269,7 +269,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       '',
       '', 
       'Total Despesas:', 
-      `- R$ ${totalExpenses.toLocaleString('pt-BR')}`
+      `- R$ ${(totalExpenses || 0).toLocaleString('pt-BR')}`
     ]);
     allRows.push([
       '', 
@@ -277,7 +277,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       '',
       '', 
       'Saldo Líquido:', 
-      `${balance >= 0 ? '+ ' : ''}R$ ${balance.toLocaleString('pt-BR')}`
+      `${balance >= 0 ? '+ ' : ''}R$ ${(balance || 0).toLocaleString('pt-BR')}`
     ]);
 
     const periodTitle = `Relatório Financeiro (${formatDate(parseISO(dateFilter.start))} - ${formatDate(parseISO(dateFilter.end))})`;
@@ -423,7 +423,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
             </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Receita Recebida</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">R$ {totalRevenue.toLocaleString('pt-BR')}</p>
+          <p className="text-2xl font-black text-slate-900">R$ {(totalRevenue || 0).toLocaleString('pt-BR')}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
@@ -432,7 +432,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
             </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Receita Pendente</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">R$ {pendingRevenue.toLocaleString('pt-BR')}</p>
+          <p className="text-2xl font-black text-slate-900">R$ {(pendingRevenue || 0).toLocaleString('pt-BR')}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
@@ -441,7 +441,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
             </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Despesas</p>
           </div>
-          <p className="text-2xl font-black text-slate-900">R$ {totalExpenses.toLocaleString('pt-BR')}</p>
+          <p className="text-2xl font-black text-slate-900">R$ {(totalExpenses || 0).toLocaleString('pt-BR')}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
@@ -451,7 +451,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Saldo Líquido</p>
           </div>
           <p className={cn("text-2xl font-black", balance >= 0 ? "text-emerald-600" : "text-red-600")}>
-            R$ {balance.toLocaleString('pt-BR')}
+            R$ {(balance || 0).toLocaleString('pt-BR')}
           </p>
         </div>
       </div>
@@ -568,7 +568,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
                         "p-4 text-xs font-bold whitespace-nowrap",
                         item.type === 'revenue' ? "text-emerald-600" : "text-red-600"
                       )}>
-                        {item.type === 'revenue' ? '+' : '-'} R$ {item.amount.toLocaleString('pt-BR')}
+                        {item.type === 'revenue' ? '+' : '-'} R$ {(item.amount || 0).toLocaleString('pt-BR')}
                       </td>
                       <td className="p-4">
                         {item.type === 'expense' && (

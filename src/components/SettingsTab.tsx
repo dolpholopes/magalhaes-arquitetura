@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Settings } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Modal } from './Modal';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,11 +12,14 @@ function cn(...inputs: ClassValue[]) {
 interface Props {
   settings: Settings;
   onUpdate: (data: Partial<Settings>) => void;
+  onResetData: () => Promise<void>;
 }
 
-export function SettingsTab({ settings, onUpdate }: Props) {
+export function SettingsTab({ settings, onUpdate, onResetData }: Props) {
   const [newCategory, setNewCategory] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,8 +49,29 @@ export function SettingsTab({ settings, onUpdate }: Props) {
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
+  const handleReset = async () => {
+    setIsResetting(true);
+    try {
+      await onResetData();
+      triggerSuccess();
+    } finally {
+      setIsResetting(false);
+      setShowResetModal(false);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
+      <Modal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        title="Resetar e Popular Dados?"
+        description="Isso apagará TODOS os seus dados atuais (clientes, projetos, despesas) e criará dados de exemplo. Esta ação é irreversível."
+        type="error"
+        confirmLabel={isResetting ? "Processando..." : "Sim, Resetar Agora"}
+        onConfirm={handleReset}
+        isDestructive
+      />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">Configurações</h2>
@@ -113,6 +138,42 @@ export function SettingsTab({ settings, onUpdate }: Props) {
                 <p className="text-slate-400 text-sm italic">Nenhuma categoria personalizada cadastrada.</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Reset Data Section */}
+        <div className="bg-white rounded-3xl border border-red-100 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-red-50 flex items-center gap-3 bg-red-50/50">
+            <div className="h-10 w-10 bg-white text-red-600 rounded-xl flex items-center justify-center shadow-sm">
+              <Trash2 className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-red-900 uppercase tracking-wider">Zona de Perigo</h3>
+              <p className="text-[10px] text-red-500 font-medium">Ações irreversíveis para o seu banco de dados.</p>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <h4 className="text-sm font-bold text-slate-900">Resetar e Popular Dados</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Apaga todos os seus dados atuais e preenche com exemplos reais de um escritório de arquitetura.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowResetModal(true)}
+                disabled={isResetting}
+                className={cn(
+                  "w-full sm:w-auto px-6 py-3 rounded-xl text-sm font-bold uppercase tracking-wider transition-all shadow-lg",
+                  isResetting 
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
+                    : "bg-red-600 text-white hover:bg-red-700 shadow-red-100"
+                )}
+              >
+                {isResetting ? 'Processando...' : 'Resetar e Popular'}
+              </button>
+            </div>
           </div>
         </div>
 

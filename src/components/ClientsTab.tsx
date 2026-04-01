@@ -27,8 +27,8 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
   });
 
   const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.cpf.includes(searchTerm)
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.cpf || '').includes(searchTerm)
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,7 +120,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
           <div key={client.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
             <div className="flex justify-between items-start mb-4">
               <div className="h-12 w-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-800 font-bold text-xl">
-                {client.name.charAt(0)}
+                {(client.name || '?').charAt(0)}
               </div>
               <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => openModal(client)} className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
@@ -131,7 +131,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                 </button>
               </div>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">{client.name}</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">{client.name || 'Sem Nome'}</h3>
             <p className="text-xs font-mono text-slate-500 mb-4">Doc: {formatCpfCnpj(client.cpf)}</p>
             
             <div className="space-y-2">
@@ -141,7 +141,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
               </div>
               <div className="flex items-start text-sm text-slate-600">
                 <span className="w-20 font-medium text-slate-400 text-[10px] uppercase tracking-wider">Endereço</span>
-                <span className="flex-1 line-clamp-2">{client.address}</span>
+                <span className="flex-1 line-clamp-2">{client.address || 'Não informado'}</span>
               </div>
             </div>
           </div>

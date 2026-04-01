@@ -1,4 +1,5 @@
-export const formatCpfCnpj = (value: string) => {
+export const formatCpfCnpj = (value: string | undefined | null) => {
+  if (!value) return '';
   const v = value.replace(/\D/g, '');
   if (v.length <= 11) {
     return v
@@ -16,7 +17,8 @@ export const formatCpfCnpj = (value: string) => {
   }
 };
 
-export const formatPhone = (value: string) => {
+export const formatPhone = (value: string | undefined | null) => {
+  if (!value) return '';
   const v = value.replace(/\D/g, '');
   if (v.length <= 10) {
     return v

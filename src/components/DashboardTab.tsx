@@ -19,33 +19,35 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
 
   const activeProjects = projects.filter(p => p.status === 'active');
   const recentContracts = [...contracts].sort((a, b) => {
-    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any).toMillis();
-    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any).toMillis();
+    const dateA = a.createdAt?.toMillis?.() || (a.createdAt instanceof Date ? a.createdAt.getTime() : 0);
+    const dateB = b.createdAt?.toMillis?.() || (b.createdAt instanceof Date ? b.createdAt.getTime() : 0);
     return dateB - dateA;
   }).slice(0, 5);
   const recentClients = [...clients].sort((a, b) => {
-    const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any).toMillis();
-    const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt as any).toMillis();
+    const dateA = a.createdAt?.toMillis?.() || (a.createdAt instanceof Date ? a.createdAt.getTime() : 0);
+    const dateB = b.createdAt?.toMillis?.() || (b.createdAt instanceof Date ? b.createdAt.getTime() : 0);
     return dateB - dateA;
   }).slice(0, 5);
 
-  const totalRevenue = allInstallments.filter(i => i.status === 'paid').reduce((acc, i) => acc + i.amount, 0);
-  const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
+  const totalRevenue = allInstallments.filter(i => i.status === 'paid').reduce((acc, i) => acc + (i.amount || 0), 0);
+  const totalExpenses = expenses.reduce((acc, e) => acc + (e.amount || 0), 0);
   
   const upcomingPayments = allInstallments
     .filter(i => {
+      if (!i.dueDate) return false;
       const date = i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate();
       return i.status === 'pending' && isAfter(date, startOfDay(new Date()));
     })
     .sort((a, b) => {
-      const dateA = a.dueDate instanceof Date ? a.dueDate.getTime() : (a.dueDate as any).toMillis();
-      const dateB = b.dueDate instanceof Date ? b.dueDate.getTime() : (b.dueDate as any).toMillis();
+      const dateA = a.dueDate?.toMillis?.() || (a.dueDate instanceof Date ? a.dueDate.getTime() : 0);
+      const dateB = b.dueDate?.toMillis?.() || (b.dueDate instanceof Date ? b.dueDate.getTime() : 0);
       return dateA - dateB;
     })
     .slice(0, 5);
 
   const overduePayments = allInstallments
     .filter(i => {
+      if (!i.dueDate) return false;
       const date = i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate();
       return i.status === 'pending' && isBefore(date, startOfDay(new Date()));
     });
@@ -64,7 +66,7 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
               <div key={inst.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-bold">
-                    {format(inst.dueDate instanceof Date ? inst.dueDate : inst.dueDate.toDate(), 'dd')}
+                    {inst.dueDate ? format(inst.dueDate instanceof Date ? inst.dueDate : inst.dueDate.toDate(), 'dd') : '--'}
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-900">{project?.name}</p>
@@ -72,7 +74,7 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-slate-900">R$ {inst.amount.toLocaleString('pt-BR')}</p>
+                  <p className="text-sm font-black text-slate-900">R$ {(inst.amount || 0).toLocaleString('pt-BR')}</p>
                   <p className="text-[10px] text-slate-600 font-bold uppercase">{formatDate(inst.dueDate)}</p>
                 </div>
               </div>
@@ -104,7 +106,7 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-red-600">R$ {inst.amount.toLocaleString('pt-BR')}</p>
+                  <p className="text-sm font-black text-red-600">R$ {(inst.amount || 0).toLocaleString('pt-BR')}</p>
                   <p className="text-[10px] text-slate-500">{client?.name}</p>
                 </div>
               </div>
@@ -141,7 +143,7 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-slate-900">R$ {project.totalValue.toLocaleString('pt-BR')}</p>
+                  <p className="text-sm font-black text-slate-900">R$ {(project.totalValue || 0).toLocaleString('pt-BR')}</p>
                   <p className="text-[10px] text-blue-600 font-bold uppercase">Ativo</p>
                 </div>
               </div>
@@ -172,10 +174,14 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
               cancelled: 'Cancelado',
               draft: 'Rascunho'
             };
+            const currentStatus = contract.status || 'draft';
+            const colorClass = statusColors[currentStatus as keyof typeof statusColors] || statusColors.draft;
+            const label = statusLabels[currentStatus as keyof typeof statusLabels] || 'Rascunho';
+
             return (
               <div key={contract.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className={`h-10 w-10 ${statusColors[contract.status]} rounded-xl flex items-center justify-center font-bold`}>
+                  <div className={`h-10 w-10 ${colorClass} rounded-xl flex items-center justify-center font-bold`}>
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
@@ -184,9 +190,9 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black text-slate-900">R$ {contract.totalValue.toLocaleString('pt-BR')}</p>
-                  <p className={`text-[10px] font-bold uppercase ${statusColors[contract.status].split(' ')[0]}`}>
-                    {statusLabels[contract.status]}
+                  <p className="text-sm font-black text-slate-900">R$ {(contract.totalValue || 0).toLocaleString('pt-BR')}</p>
+                  <p className={`text-[10px] font-bold uppercase ${(colorClass || '').split(' ')[0]}`}>
+                    {label}
                   </p>
                 </div>
               </div>
@@ -262,7 +268,7 @@ export function DashboardTab({ clients, projects, contracts, expenses, allInstal
             <TrendingUp className="h-6 w-6" />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Lucro Total</p>
-          <p className="text-3xl font-black text-emerald-600">R$ {(totalRevenue - totalExpenses).toLocaleString('pt-BR')}</p>
+          <p className="text-3xl font-black text-emerald-600">R$ {((totalRevenue || 0) - (totalExpenses || 0)).toLocaleString('pt-BR')}</p>
         </div>
       </div>
 

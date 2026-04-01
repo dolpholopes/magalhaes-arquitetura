@@ -610,6 +610,7 @@ export function ProjectsTab({ projects, clients, installments, onAdd, onUpdate, 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Descrição</label>
                 <textarea
+                  required
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all h-24 resize-none"

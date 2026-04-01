@@ -229,6 +229,7 @@ export default function App() {
     try {
       const updateData: any = { ...data };
       if (data.date) updateData.date = data.date instanceof Date ? Timestamp.fromDate(data.date) : data.date;
+      if (data.projectId === '') updateData.projectId = null;
       await updateDoc(doc(db, `users/${user.uid}/expenses/${id}`), updateData);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/expenses/${id}`);

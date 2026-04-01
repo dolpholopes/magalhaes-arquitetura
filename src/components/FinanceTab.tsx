@@ -199,12 +199,24 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAddExpense({
-      ...formData,
-      date: new Date(formData.date) as any
-    });
-    setIsModalOpen(false);
-    setFormData({ projectId: '', description: '', amount: 0, date: format(new Date(), 'yyyy-MM-dd'), category: 'Geral' });
+    try {
+      const expenseDate = new Date(formData.date + 'T12:00:00');
+      if (isNaN(expenseDate.getTime())) {
+        throw new Error('Data inválida');
+      }
+      
+      const submissionData = {
+        ...formData,
+        projectId: formData.projectId || null,
+        date: expenseDate as any
+      };
+      
+      await onAddExpense(submissionData);
+      setIsModalOpen(false);
+      setFormData({ projectId: '', description: '', amount: 0, date: format(new Date(), 'yyyy-MM-dd'), category: 'Geral' });
+    } catch (error) {
+      console.error("Erro ao adicionar despesa:", error);
+    }
   };
 
   const handleDeleteExpenseClick = async (id: string) => {
@@ -646,6 +658,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all"
+                  required
                 >
                   {expenseCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>

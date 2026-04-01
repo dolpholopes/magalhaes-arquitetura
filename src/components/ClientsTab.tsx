@@ -190,6 +190,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Contato</label>
                   <input
+                    required
                     type="text"
                     value={formData.contact}
                     onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
@@ -199,6 +200,7 @@ export function ClientsTab({ clients, onAdd, onUpdate, onDelete }: Props) {
                 <div className="md:col-span-2 space-y-1">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Endereço</label>
                   <textarea
+                    required
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-500 outline-none transition-all h-24 resize-none"

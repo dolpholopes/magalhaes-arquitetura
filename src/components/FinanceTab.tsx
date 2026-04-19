@@ -131,6 +131,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   const [clientFilter, setClientFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
   const [currentChart, setCurrentChart] = useState(0);
+  const [historySlide, setHistorySlide] = useState(0);
 
   const currentYear = new Date().getFullYear();
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
@@ -322,6 +323,18 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
     const dateB = (b.date instanceof Date ? b.date : (b.date as any).toDate()).getTime();
     return dateB - dateA;
   });
+
+  const currentSlideHistory = historySlide === 0 
+    ? combinedHistory 
+    : historySlide === 1 
+      ? combinedHistory.filter(item => item.type === 'revenue')
+      : combinedHistory.filter(item => item.type === 'expense');
+
+  const historySlideTitle = historySlide === 0 
+    ? "Histórico Geral" 
+    : historySlide === 1 
+      ? "Histórico de Receitas" 
+      : "Histórico de Despesas";
 
   return (
     <div className="space-y-6">
@@ -548,10 +561,32 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
         {/* Financial History Table */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Histórico Financeiro</h3>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-              {combinedHistory.length} registros
-            </span>
+            <div className="flex flex-col">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">{historySlideTitle}</h3>
+              <span className="text-[10px] font-bold text-slate-400">
+                {currentSlideHistory.length} registros
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setHistorySlide(prev => (prev - 1 + 3) % 3)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="flex gap-1">
+                {[0, 1, 2].map(idx => (
+                  <div key={idx} className={cn("h-1.5 w-1.5 rounded-full transition-all", historySlide === idx ? "bg-slate-800 w-3" : "bg-slate-200")} />
+                ))}
+              </div>
+              <button 
+                onClick={() => setHistorySlide(prev => (prev + 1) % 3)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left border-collapse min-w-[600px]">
@@ -565,8 +600,8 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {combinedHistory.length > 0 ? (
-                  combinedHistory.map(item => (
+                {currentSlideHistory.length > 0 ? (
+                  currentSlideHistory.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                       <td className="p-4 text-xs text-slate-600 whitespace-nowrap">{formatDate(item.dueDate)}</td>
                       <td className="p-4 text-xs text-slate-600 whitespace-nowrap">

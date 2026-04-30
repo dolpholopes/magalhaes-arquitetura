@@ -3,7 +3,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, Timestamp, onSnapshot, query, orderBy, collectionGroup } from 'firebase/firestore';
 import { Project, Expense, Installment, Client } from '../types';
 import { Plus, Search, Edit2, Trash2, X, DollarSign, TrendingUp, TrendingDown, PieChart as PieChartIcon, Filter, Download, FileText, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, isSameMonth, startOfYear, addMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, isSameMonth, startOfYear, addMonths, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { exportToPDF } from '../utils/export';
@@ -134,6 +134,14 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   const [historySlide, setHistorySlide] = useState(0);
 
   const currentYear = new Date().getFullYear();
+
+  const getValidDate = (date: any): Date => {
+    if (!date) return new Date();
+    if (date instanceof Date) return date;
+    if (typeof date.toDate === 'function') return date.toDate();
+    const d = new Date(date);
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
   const months = Array.from({ length: 12 }, (_, i) => new Date(currentYear, i, 1));
 
   const handleMonthClick = (month: Date) => {
@@ -155,10 +163,10 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   });
 
   const filteredExpenses = expenses.filter(e => {
-    const date = e.date instanceof Date ? e.date : (e.date as any).toDate();
+    const date = getValidDate(e.date);
     const isWithinDate = isWithinInterval(date, { 
       start: parseISO(dateFilter.start), 
-      end: parseISO(dateFilter.end) 
+      end: endOfDay(parseISO(dateFilter.end)) 
     });
     const isProjectMatch = projectFilter === 'all' || e.projectId === projectFilter;
     const project = projects.find(p => p.id === e.projectId);
@@ -167,12 +175,12 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   });
 
   const filteredInstallments = allInstallments.filter(i => {
-    const date = (i.status === 'paid' && i.paidAt) 
-      ? (i.paidAt instanceof Date ? i.paidAt : (i.paidAt as any).toDate())
-      : (i.dueDate instanceof Date ? i.dueDate : (i.dueDate as any).toDate());
+    // Se estiver paga, deve ser filtrada pela data de pagamento
+    // Se estiver pendente, pela data de vencimento
+    const date = i.status === 'paid' && i.paidAt ? getValidDate(i.paidAt) : getValidDate(i.dueDate);
     const isWithinDate = isWithinInterval(date, { 
       start: parseISO(dateFilter.start), 
-      end: parseISO(dateFilter.end) 
+      end: endOfDay(parseISO(dateFilter.end)) 
     });
     const isProjectMatch = projectFilter === 'all' || i.projectId === projectFilter;
     const project = projects.find(p => p.id === i.projectId);
@@ -188,8 +196,8 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   // Chart Data
   const revenueByProject = projects.map(p => ({
     name: p.name,
-    receita: allInstallments.filter(i => i.projectId === p.id && i.status === 'paid').reduce((acc, i) => acc + i.amount, 0),
-    despesa: expenses.filter(e => e.projectId === p.id).reduce((acc, e) => acc + e.amount, 0)
+    receita: filteredInstallments.filter(i => i.projectId === p.id && i.status === 'paid').reduce((acc, i) => acc + i.amount, 0),
+    despesa: filteredExpenses.filter(e => e.projectId === p.id).reduce((acc, e) => acc + e.amount, 0)
   })).filter(d => d.receita > 0 || d.despesa > 0);
 
   const statusData = [
@@ -298,16 +306,19 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
   };
 
   const combinedHistory = [
-    ...filteredInstallments.filter(i => i.status === 'paid').map(i => ({
-      id: i.id,
-      date: i.paidAt || i.dueDate,
-      dueDate: i.dueDate,
-      paidAt: i.paidAt,
-      description: projects.find(p => p.id === i.projectId)?.name || 'Projeto não encontrado',
-      category: 'Recebimento',
-      amount: i.amount,
-      type: 'revenue' as const
-    })),
+    ...filteredInstallments.filter(i => i.status === 'paid').map(i => {
+      const project = projects.find(p => p.id === i.projectId);
+      return {
+        id: i.id,
+        date: i.paidAt || i.dueDate,
+        dueDate: i.dueDate,
+        paidAt: i.paidAt,
+        description: project ? project.name : 'Projeto não encontrado',
+        category: 'Recebimento',
+        amount: i.amount,
+        type: 'revenue' as const
+      };
+    }),
     ...filteredExpenses.map(e => ({
       id: e.id,
       date: e.date,
@@ -319,8 +330,8 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
       type: 'expense' as const
     }))
   ].sort((a, b) => {
-    const dateA = (a.date instanceof Date ? a.date : (a.date as any).toDate()).getTime();
-    const dateB = (b.date instanceof Date ? b.date : (b.date as any).toDate()).getTime();
+    const dateA = getValidDate(a.date).getTime();
+    const dateB = getValidDate(b.date).getTime();
     return dateB - dateA;
   });
 
@@ -592,8 +603,7 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Vencimento</th>
-                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Pagamento</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Data</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Descrição</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Valor</th>
                   <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Ações</th>
@@ -603,9 +613,11 @@ export function FinanceTab({ projects, clients, expenses, allInstallments, expen
                 {currentSlideHistory.length > 0 ? (
                   currentSlideHistory.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-4 text-xs text-slate-600 whitespace-nowrap">{formatDate(item.dueDate)}</td>
                       <td className="p-4 text-xs text-slate-600 whitespace-nowrap">
-                        {item.paidAt ? formatDate(item.paidAt) : '-'}
+                        <div className="font-bold text-slate-900">{formatDate(item.date)}</div>
+                        {item.type === 'revenue' && item.paidAt && (
+                          <div className="text-[9px] text-slate-400 uppercase tracking-tighter">Venc: {formatDate(item.dueDate)}</div>
+                        )}
                       </td>
                       <td className="p-4 text-xs font-medium text-slate-900">
                         <div className="truncate max-w-[150px]" title={item.description}>{item.description}</div>

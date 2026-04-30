@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Contract, Client } from '../types';
 import { Plus, Search, Edit2, Trash2, X, FileText, Calendar, DollarSign, CheckCircle2, Clock, AlertCircle, ChevronDown, Download, Hash, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isSameMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, isSameMonth, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { exportToPDF } from '../utils/export';
 import { formatDate } from '../utils/date';
@@ -55,11 +55,18 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
     description: ''
   });
 
+  const getValidDate = (d: any) => {
+    if (!d) return new Date();
+    if (d instanceof Date) return d;
+    if (typeof d.toDate === 'function') return d.toDate();
+    return new Date(d);
+  };
+
   const filteredContracts = contracts.filter(c => {
-    const date = c.createdAt instanceof Date ? c.createdAt : (c.createdAt as any).toDate();
+    const date = getValidDate(c.createdAt);
     const isWithinDate = isWithinInterval(date, { 
       start: parseISO(dateFilter.start), 
-      end: parseISO(dateFilter.end) 
+      end: endOfDay(parseISO(dateFilter.end)) 
     });
     const client = clients.find(cl => cl.id === c.clientId);
     const matchesSearch = (c.contractNumber || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
@@ -73,7 +80,7 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
     total: filteredContracts.length,
     active: filteredContracts.filter(c => c.status === 'active').length,
     completed: filteredContracts.filter(c => c.status === 'completed').length,
-    totalValue: filteredContracts.reduce((acc, c) => acc + c.totalValue, 0)
+    totalValue: filteredContracts.reduce((acc, c) => acc + (c.totalValue || 0), 0)
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -326,6 +333,9 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
                     <span className="text-[10px] font-bold uppercase tracking-widest">Nº {contract.contractNumber}</span>
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 leading-tight">{client?.name || 'Cliente não encontrado'}</h3>
+                  {contract.description && (
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{contract.description}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -366,6 +376,14 @@ export function ContractsTab({ contracts, clients, onAdd, onUpdate, onDelete }: 
               <div className="space-y-1 relative">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Cliente</label>
                 <div className="relative">
+                  <input 
+                    type="text" 
+                    required 
+                    value={formData.clientId} 
+                    onChange={() => {}} 
+                    className="absolute opacity-0 w-0 h-0" 
+                    tabIndex={-1} 
+                  />
                   <div 
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-slate-500 transition-all flex items-center justify-between cursor-pointer"
                     onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}

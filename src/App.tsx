@@ -357,9 +357,10 @@ export default function App() {
       // 4. Contracts
       await addDoc(collection(db, `users/${user.uid}/contracts`), {
         clientId: client1.id,
-        title: 'Contrato de Prestação de Serviços - Horizonte',
-        content: 'Contrato referente ao projeto de reforma do apartamento 402...',
-        status: 'signed',
+        contractNumber: '2024-001',
+        description: 'Contrato referente ao projeto de reforma do apartamento 402...',
+        status: 'active',
+        totalValue: 15000,
         createdAt: Timestamp.now()
       });
 
